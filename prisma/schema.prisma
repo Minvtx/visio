@@ -1,0 +1,445 @@
+// Prisma Schema for Content Studio AI
+// Based on CONTENT_STUDIO_AI_SPEC.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTH
+// ============================================
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  name        String
+  password    String?
+  role        UserRole  @default(CLIENT)
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  comments    Comment[]
+  activityLogs ActivityLog[]
+  notifications Notification[]
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  CREATOR
+  REVIEWER
+  CLIENT
+}
+
+// ============================================
+// WORKSPACE & CLIENT
+// ============================================
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  settings  Json?
+  createdAt DateTime @default(now())
+  clients   Client[]
+  users     User[]
+}
+
+model Client {
+  id            String        @id @default(uuid())
+  workspaceId   String
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String
+  industry      String?
+  description   String?
+  country       String?       // "Argentina", "México"
+  city          String?       // "Buenos Aires", "CABA"
+  dialect       String?       // "Argentino (voseo)", "Neutro", "Mexicano"
+  brandKit      BrandKit?
+  knowledgeBase KnowledgeBase?
+  plan          Plan?         @relation(fields: [planId], references: [id])
+  planId        String?
+  assets        Asset[]
+  contentMonths ContentMonth[]
+  users         User[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([workspaceId, slug])
+}
+
+// ============================================
+// BRAND KIT & KNOWLEDGE BASE
+// ============================================
+
+model BrandKit {
+  id               String   @id @default(uuid())
+  clientId         String   @unique
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  // Identidad
+  brandPersonality   String[]  // ["Innovador", "Cercano"]
+  brandArchetype     String?   // "El Sabio", "El Héroe"
+  tagline           String?
+  missionStatement  String?   @db.Text
+  valueProposition  String?   @db.Text
+
+  // Voz y Tono
+  tone             String   // "profesional pero amigable" (Legacy but kept for compatibility)
+  primaryTone       String?    // "Profesional pero cercano"
+  secondaryTone     String?
+  communicationStyle String?  // "formal", "casual", "técnico"
+  speakingAs        String?   // "nosotros", "yo", "la marca"
+  emojiUsage        String?   // "nunca", "mínimo", "moderado"
+  voiceDescription String?  @db.Text
+
+  // Guardrails
+  guardrails       String[] // ["No claims médicos"]
+  forbiddenWords   String[] // ["barato", "el mejor"]
+  forbiddenTopics   String[]
+  requiredMentions  String[]  // Siempre mencionar
+  competitorNames   String[]  // Nunca mencionar
+
+  // Hashtags
+  requiredHashtags  String[]
+  forbiddenHashtags String[]
+  hashtagsPerPost   Int       @default(10)
+
+  // Visual
+  colorPalette      Json?     // {primary, secondary, accent}
+  typography        Json?     // {headings, body, accent}
+  visualStyle       String?   // "Minimalista moderno"
+  photoStyle        String?   // "Lifestyle", "Corporativo"
+  
+  updatedAt        DateTime @updatedAt
+}
+
+model KnowledgeBase {
+  id             String   @id @default(uuid())
+  clientId       String   @unique
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  about          String?  @db.Text
+  history        String?   @db.Text
+
+  // Productos/Servicios
+  products       Json?    // Array de productos/servicios
+  services         Json?
+
+  // Audiencias
+  targetAudience Json?    // Descripción de audiencia
+  targetAudiences  Json?     // Array con demographics, painPoints, desires
+
+  // Social Proof
+  competitors    String[]
+  testimonials     String[]
+  caseStudies      String[]
+  keyMetrics       String[]  // "500+ clientes", "10 años"
+  
+  // Historial
+  topPerformingContent  Json?   // Qué funcionó
+  contentToAvoid        String[]
+  frequentFeedback      String[]
+
+  customFields   Json?    // Campos adicionales flexibles
+  updatedAt      DateTime @updatedAt
+}
+
+// ============================================
+// PLAN
+// ============================================
+
+model Plan {
+  id                String   @id @default(uuid())
+  name              String   // "Base", "Growth", "Pro"
+  postsPerMonth     Int      @default(12)
+  carouselsPerMonth Int      @default(4)
+  reelsPerMonth     Int      @default(4)
+  storiesPerMonth   Int      @default(8)
+  clients           Client[]
+  createdAt         DateTime @default(now())
+}
+
+// ============================================
+// CONTENT MONTH & PIECES
+// ============================================
+
+model ContentMonth {
+  id          String             @id @default(uuid())
+  clientId    String
+  client      Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  year        Int
+  month       Int                // 1-12
+  status      ContentMonthStatus @default(DRAFT)
+  
+  // Strategy Brief
+  primaryObjective    String?   // "awareness", "leads", "sales"
+  specificGoal        String?   @db.Text
+  kpis               String[]
+  
+  // Context
+  seasonality         String?
+  relevantDates       Json?     // [{date, event, relevance}]
+  industryTrends      String[]
+  competitorActivity  String?   @db.Text
+  
+  // Campaigns
+  activeCampaigns     Json?     // [{name, objective, cta, dates}]
+  
+  // Pillars
+  contentPillars      Json?     // [{name, percentage, description}]
+
+  // User specifically provided content/context
+  strategicInputs     Json?     // [{id, type, content, assetIds, date, pieceType}]
+
+  strategy    Json?              // {objectives, pillars, keyMessages} (Legacy)
+  calendar    Json?              // {weeks: [{pieces: []}]}
+  generatedAt DateTime?
+  lockedAt    DateTime?
+  pieces      ContentPiece[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@unique([clientId, year, month])
+}
+
+enum ContentMonthStatus {
+  DRAFT
+  GENERATING
+  GENERATED
+  IN_REVIEW
+  APPROVED
+  LOCKED
+  EXPORTED
+}
+
+model ContentPiece {
+  id             String             @id @default(uuid())
+  contentMonthId String
+  contentMonth   ContentMonth       @relation(fields: [contentMonthId], references: [id], onDelete: Cascade)
+  title          String             // Hook principal o tema
+  type           ContentFormat      // POST, CAROUSEL, REEL, STORY
+  pillar         String?
+  copy           Json?              // {hooks, captionLong, captionShort, ctas}
+  hashtags       String[]
+  visualBrief    String?            @db.Text // Concepto visual o JSON con diseño
+  status         ContentPieceStatus @default(DRAFT)
+  suggestedDate  DateTime?
+  order          Int                @default(0)
+  metadata       Json?              // {objective, suggestedTime, carouselSlides}
+  assets         Asset[]
+  generations    GenerationRun[]
+  approvedAt     DateTime?
+  approvedBy     String?            // userId
+  feedback       String?            @db.Text
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  // Versioning & QA
+  currentVersionId String?           @unique
+  versions         ContentPieceVersion[]
+  comments         Comment[]
+  qualityChecks    QualityCheck[]
+}
+
+enum ContentFormat {
+  POST
+  CAROUSEL
+  REEL
+  STORY
+  THREAD
+}
+
+enum ContentPieceStatus {
+  IDEA
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================
+// ASSETS
+// ============================================
+
+model Asset {
+  id         String         @id @default(uuid())
+  clientId   String
+  client     Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  filename   String
+  url        String
+  mimeType   String
+  sizeBytes  Int
+  tags       String[]
+  pieces     ContentPiece[]
+  uploadedAt DateTime       @default(now())
+}
+
+// ============================================
+// SKILLS & GENERATION
+// ============================================
+
+model Skill {
+  id           String        @id // "hook_variants"
+  name         String        // "Hook Variants Generator"
+  category     SkillCategory
+  description  String?
+  inputSchema  Json
+  outputSchema Json
+  systemPrompt String        @db.Text
+  temperature  Float         @default(0.7)
+  maxTokens    Int           @default(1000)
+  active       Boolean       @default(true)
+  generations  GenerationRun[]
+  createdAt    DateTime      @default(now())
+}
+
+enum SkillCategory {
+  STRATEGY
+  COPY
+  VISUAL
+  QA
+}
+
+model GenerationRun {
+  id             String        @id @default(uuid())
+  contentPieceId String?
+  contentPiece   ContentPiece? @relation(fields: [contentPieceId], references: [id], onDelete: Cascade)
+  skillId        String
+  skill          Skill         @relation(fields: [skillId], references: [id])
+  input          Json
+  output         Json
+  tokensUsed     Int
+  version        Int           @default(1)
+  createdAt      DateTime      @default(now())
+}
+
+// ============================================
+// V1 FEATURES: JOBS, FEEDBACK, QA
+// ============================================
+
+model Job {
+  id          String    @id @default(uuid())
+  type        String
+  status      JobStatus @default(QUEUED)
+  
+  resourceId  String?
+  resourceType String?
+  
+  payload     Json
+  result      Json?
+  error       String?
+  
+  progress    Int       @default(0)
+  
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  userId      String?
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model ContentPieceVersion {
+  id             String        @id @default(uuid())
+  pieceId        String
+  piece          ContentPiece  @relation(fields: [pieceId], references: [id], onDelete: Cascade)
+  
+  versionNumber  Int
+  copy           Json?
+  visualBrief    String?
+  
+  changelog      String?
+  sourceSkillId   String?
+  
+  createdAt      DateTime      @default(now())
+  createdBy      String?
+  
+  qualityCheck   QualityCheck?
+}
+
+model Comment {
+  id          String       @id @default(uuid())
+  pieceId     String
+  piece       ContentPiece @relation(fields: [pieceId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  
+  content     String
+  quotedText  String?
+  blockId     String?
+  
+  status      CommentStatus @default(OPEN)
+  
+  createdAt   DateTime     @default(now())
+  resolvedAt  DateTime?
+}
+
+enum CommentStatus {
+  OPEN
+  RESOLVED
+  IGNORED
+}
+
+model QualityCheck {
+  id             String              @id @default(uuid())
+  pieceId        String
+  piece          ContentPiece        @relation(fields: [pieceId], references: [id], onDelete: Cascade)
+  
+  versionId      String?             @unique
+  version        ContentPieceVersion? @relation(fields: [versionId], references: [id])
+  
+  score          Int
+  passed         Boolean
+  
+  violations     Json?
+  suggestions    Json?
+  
+  runAt          DateTime            @default(now())
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  action      String   // "CREATE_PIECE", "APPROVE_PIECE", "UPDATE_BRAND_KIT"
+  resourceId  String?
+  resourceType String? // "ContentPiece", "BrandKit"
+  details     Json?
+  
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // "COMMENT", "REVIEW_REQUEST", "APPROVED", "REJECTED"
+  title       String
+  message     String
+  read        Boolean  @default(false)
+  
+  resourceId  String?
+  resourceType String? // "ContentPiece"
+  
+  createdAt   DateTime @default(now())
+}
