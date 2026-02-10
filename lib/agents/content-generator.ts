@@ -281,7 +281,7 @@ class ContentGenerator {
         console.log(`[ContentGenerator] Generating ${plan.posts + plan.carousels + plan.reels + plan.stories} pieces for ${brand.name}...`)
 
         const response = await client.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 16000,
             temperature: 0.7,
             system: systemPrompt,

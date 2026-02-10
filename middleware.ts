@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
     // Public routes - allow access
     if (
         pathname.startsWith('/login') ||
+        pathname.startsWith('/register') ||
         pathname.startsWith('/setup') ||
         pathname.startsWith('/api/auth') ||
         pathname === '/'

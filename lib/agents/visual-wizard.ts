@@ -251,7 +251,7 @@ Los prompts de Midjourney y DALL-E deben generar imágenes que complementen el d
 
         try {
             const response = await this.anthropic.messages.create({
-                model: 'claude-sonnet-4-20250514',
+                model: 'claude-3-5-sonnet-20241022',
                 max_tokens: 4000,
                 temperature: 0.6,
                 system: SYSTEM_PROMPT,
@@ -324,7 +324,7 @@ Responde en JSON:
 `
 
         const response = await this.anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 800,
             temperature: 0.7,
             system: 'Eres un experto en prompt engineering para generación de imágenes con IA. Generas prompts optimizados para Midjourney y DALL-E.',

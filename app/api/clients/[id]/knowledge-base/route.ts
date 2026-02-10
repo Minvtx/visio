@@ -45,7 +45,7 @@ export async function PATCH(
                 targetAudiences: targetAudience || null,
                 products: products || null,
                 competitors: competitors || [],
-                customFields: uniqueValue ? { uniqueValue } : null,
+                customFields: uniqueValue ? { uniqueValue } : null as any,
             },
             create: {
                 clientId: params.id,
@@ -55,7 +55,7 @@ export async function PATCH(
                 targetAudiences: targetAudience || null,
                 products: products || null,
                 competitors: competitors || [],
-                customFields: uniqueValue ? { uniqueValue } : null,
+                customFields: uniqueValue ? { uniqueValue } : null as any,
             },
         })
 

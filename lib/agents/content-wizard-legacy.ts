@@ -245,7 +245,7 @@ Genera el contenido ahora.
 
         try {
             const response = await this.anthropic.messages.create({
-                model: 'claude-sonnet-4-20250514',
+                model: 'claude-3-5-sonnet-20241022',
                 max_tokens: 16000,
                 temperature: 0.7,
                 system: SYSTEM_PROMPT,
@@ -319,7 +319,7 @@ Responde con el JSON de la pieza única (sin el array "pieces", solo el objeto d
 `
 
         const response = await this.anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 2000,
             temperature: 0.8, // Más creatividad para regeneración
             system: SYSTEM_PROMPT,

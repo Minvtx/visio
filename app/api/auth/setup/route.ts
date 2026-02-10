@@ -37,9 +37,10 @@ export async function POST(request: Request) {
 
         // Create admin user
         const hashedPassword = await hashPassword(password)
+        const normalizedEmail = email.toLowerCase()
         const user = await prisma.user.create({
             data: {
-                email,
+                email: normalizedEmail,
                 password: hashedPassword,
                 name,
                 role: 'ADMIN',

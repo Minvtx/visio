@@ -81,6 +81,7 @@ interface Client {
         customFields?: any
     } | null
     contentMonths: ContentMonth[]
+    googleDriveFolderId?: string | null
     _count: {
         assets: number
         users: number
@@ -119,6 +120,7 @@ export default function ClientDetailPage() {
     })
     const [error, setError] = useState('')
     const [currentJobId, setCurrentJobId] = useState<string | null>(null)
+    const [initializingDrive, setInitializingDrive] = useState(false)
 
     useEffect(() => {
         fetchClient()
@@ -161,6 +163,24 @@ export default function ClientDetailPage() {
             }
         } catch (err) {
             console.error('Error fetching assets:', err)
+        }
+    }
+
+    const handleInitDrive = async () => {
+        setInitializingDrive(true)
+        try {
+            const res = await fetch(`/api/clients/${clientId}/init-drive`, {
+                method: 'POST',
+            })
+            if (!res.ok) throw new Error('Error al inicializar Drive')
+            const data = await res.json()
+            alert(`Google Drive inicializado: ${data.name}`)
+            await fetchClient()
+        } catch (err) {
+            console.error(err)
+            alert('Error al inicializar Google Drive')
+        } finally {
+            setInitializingDrive(false)
         }
     }
 
@@ -350,6 +370,30 @@ export default function ClientDetailPage() {
                                 <Bot className="w-4 h-4 mr-2" />
                                 Configurar Agente
                             </Button>
+                            {!client.googleDriveFolderId && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleInitDrive}
+                                    disabled={initializingDrive}
+                                    className="border-blue-500/30 text-blue-600 hover:bg-blue-500/5"
+                                >
+                                    {initializingDrive ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <ImageIcon className="w-4 h-4 mr-2" />
+                                    )}
+                                    Vincular Drive
+                                </Button>
+                            )}
+                            {client.googleDriveFolderId && (
+                                <Link href={`https://drive.google.com/drive/folders/${client.googleDriveFolderId}`} target="_blank">
+                                    <Button variant="outline" size="sm" className="border-emerald-500/30 text-emerald-600">
+                                        <ImageIcon className="w-4 h-4 mr-2" />
+                                        Ver en Drive
+                                    </Button>
+                                </Link>
+                            )}
                             <Button
                                 size="sm"
                                 onClick={() => setShowGenerateModal(true)}

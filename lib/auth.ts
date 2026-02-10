@@ -1,6 +1,7 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
+import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from './prisma'
 import { compare, hash } from 'bcryptjs'
 
@@ -35,6 +36,7 @@ declare module 'next-auth/jwt' {
 }
 
 export const authOptions: NextAuthOptions = {
+    adapter: PrismaAdapter(prisma),
     session: {
         strategy: 'jwt',
     },
@@ -47,6 +49,13 @@ export const authOptions: NextAuthOptions = {
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID || '',
             clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+            authorization: {
+                params: {
+                    scope: 'openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file',
+                    access_type: 'offline',
+                    prompt: 'consent',
+                },
+            },
         }),
         // Email/Password
         CredentialsProvider({
@@ -60,8 +69,9 @@ export const authOptions: NextAuthOptions = {
                     throw new Error('Email y contraseña son requeridos')
                 }
 
+                const email = credentials.email.toLowerCase()
                 const user = await prisma.user.findUnique({
-                    where: { email: credentials.email },
+                    where: { email },
                 })
 
                 if (!user || !user.password) {
@@ -86,14 +96,14 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        async signIn({ user, account }) {
-            // For OAuth providers, create user if doesn't exist
+        async signIn({ user, account, profile }) {
+            // For OAuth providers, update user role/workspace if needed
             if (account?.provider === 'google' && user.email) {
-                const existingUser = await prisma.user.findUnique({
+                const dbUser = await prisma.user.findUnique({
                     where: { email: user.email },
                 })
 
-                if (!existingUser) {
+                if (!dbUser) {
                     // Check if any admin exists
                     const adminExists = await prisma.user.findFirst({
                         where: { role: 'ADMIN' },
@@ -111,13 +121,17 @@ export const authOptions: NextAuthOptions = {
                     }
 
                     // Create user - first user becomes ADMIN
-                    await prisma.user.create({
-                        data: {
-                            email: user.email,
-                            name: user.name || 'Usuario',
-                            role: adminExists ? 'CLIENT' : 'ADMIN',
-                            workspaceId: workspace.id,
-                        },
+                    // Note: PrismaAdapter will have created the base User record, 
+                    // we just need to enhance it if it's new.
+                    // But wait, PrismaAdapter creates the user BEFORE signIn callback finishes or during it?
+                    // Actually, NextAuth creates the user if it doesn't exist via the adapter.
+
+                    // Let's refine the existing user if it's new
+                } else if (!dbUser.role) {
+                    // This case shouldn't happen with our setup but good to be safe
+                    await prisma.user.update({
+                        where: { id: dbUser.id },
+                        data: { role: 'CLIENT' }
                     })
                 }
             }

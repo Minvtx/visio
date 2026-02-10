@@ -51,7 +51,7 @@ export async function humanize(
         const client = await getClient(workspaceId)
 
         const response = await client.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 2000,
             temperature: 0.6,
             system: `Eres un experto en hacer que el contenido suene natural y humano.
@@ -140,7 +140,7 @@ export async function brandCheck(
         const client = await getClient(workspaceId)
 
         const response = await client.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 1500,
             temperature: 0.3,
             system: `Eres un QA de contenido que valida si un copy cumple con los lineamientos de marca.
@@ -235,7 +235,7 @@ export async function regeneratePiece(
         const client = await getClient(workspaceId)
 
         const response = await client.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 3000,
             temperature: 0.8, // Higher for variety
             system: `Eres un copywriter experto generando contenido fresco y único.
@@ -339,7 +339,7 @@ export async function improveCopy(
         }
 
         const response = await client.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 2000,
             temperature: 0.6,
             system: `Eres un editor de copy experto. Tu trabajo es mejorar contenido existente según instrucciones específicas.

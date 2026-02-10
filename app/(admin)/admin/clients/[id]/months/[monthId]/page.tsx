@@ -136,6 +136,7 @@ export default function ContentMonthPage() {
     const [error, setError] = useState('')
     const [showExportMenu, setShowExportMenu] = useState(false)
     const [exporting, setExporting] = useState<string | null>(null)
+    const [syncingCalendar, setSyncingCalendar] = useState(false)
     const [activePiece, setActivePiece] = useState<any>(null) // For DragOverlay
 
     const sensors = useSensors(
@@ -160,6 +161,23 @@ export default function ContentMonthPage() {
     useEffect(() => {
         fetchMonth()
     }, [monthId])
+
+    const handleSyncCalendar = async () => {
+        setSyncingCalendar(true)
+        try {
+            const res = await fetch(`/api/months/${monthId}/sync-calendar`, {
+                method: 'POST',
+            })
+            if (!res.ok) throw new Error('Error al sincronizar')
+            const data = await res.json()
+            alert(`Sincronización completada: ${data.processed} eventos creados.`)
+        } catch (err) {
+            console.error(err)
+            setError('Error al sincronizar con Google Calendar')
+        } finally {
+            setSyncingCalendar(false)
+        }
+    }
 
     const handleExport = async (format: 'json' | 'csv' | 'txt') => {
         setExporting(format)
@@ -307,6 +325,19 @@ export default function ContentMonthPage() {
                     <p className="text-muted-foreground mt-1">{monthData.client?.name}</p>
                 </div>
                 <div className="flex gap-2 relative">
+                    <Button
+                        variant="outline"
+                        onClick={handleSyncCalendar}
+                        disabled={syncingCalendar}
+                        className="border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-600 hover:text-emerald-700"
+                    >
+                        {syncingCalendar ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <Calendar className="w-4 h-4 mr-2" />
+                        )}
+                        Sincronizar Calendar
+                    </Button>
                     <Button variant="outline">
                         <RotateCcw className="w-4 h-4 mr-2" />
                         Regenerar

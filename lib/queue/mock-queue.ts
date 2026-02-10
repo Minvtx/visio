@@ -30,7 +30,8 @@ export async function createJob(
     payload: any,
     resourceId?: string,
     resourceType?: string,
-    userId?: string
+    userId?: string,
+    waitForCompletion: boolean = false
 ) {
     // 1. Create Job Record
     const job = await prisma.job.create({
@@ -57,7 +58,7 @@ export async function createJob(
  * The "Worker" logic. 
  * Fetches the job, finds handler, runs it, updates status.
  */
-async function processJob(jobId: string) {
+export async function processJob(jobId: string) {
     try {
         // 1. Mark Running
         const job = await prisma.job.update({
