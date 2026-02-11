@@ -212,13 +212,12 @@ export default function ContentMonthPage() {
 
             interval = setInterval(async () => {
                 const refreshed = await fetchMonth();
-                if (refreshed?.status !== 'GENERATING') {
+                // ONLY close if we got a valid response AND status is no longer GENERATING
+                if (refreshed && refreshed.status !== 'GENERATING') {
                     setGenerating(false);
                     if (interval) clearInterval(interval);
                 }
             }, 6000); // Poll every 6s
-        } else if (generating && monthData?.status !== 'GENERATING') {
-            setGenerating(false);
         }
 
         return () => {
@@ -345,13 +344,13 @@ export default function ContentMonthPage() {
             }
 
             // 2. Immediately refresh status
+            setGenStatus('✅ Trabajo enviado correctamente.')
             await fetchMonth()
-            setGenStatus('⏳ Trabajo en cola. Las piezas irán apareciendo aquí...')
 
         } catch (err: any) {
             console.error('Error generación:', err)
-            setGenerating(false)
-            setGenStatus('')
+            // DO NOT setGenerating(false) here, let the user see the error in the wizard
+            setGenStatus(`❌ Error: ${err.message}`)
             setError(`❌ Error: ${err.message}`)
             // Reset backend state
             fetch(`/api/months/${monthId}/reset`, { method: 'POST' }).catch(() => { })
