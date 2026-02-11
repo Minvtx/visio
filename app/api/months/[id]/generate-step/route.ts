@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-export const maxDuration = 60; // Increased for Pro / Faster processing
+export const maxDuration = 300; // Vercel Pro: 5 minutes
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
