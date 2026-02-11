@@ -236,8 +236,12 @@ export default function ContentMonthPage() {
         }
     }
 
-    const handleRegenerate = async () => {
+    const handleRegenerate = async (e?: React.MouseEvent) => {
+        if (e) e.preventDefault()
+
+        if (generating) return
         if (!confirm('¿Seguro que quieres borrar todo el contenido actual y generar este mes?')) return
+
         setGenerating(true)
         setError('')
         setGenProgress(0)
@@ -600,7 +604,7 @@ export default function ContentMonthPage() {
                 >
                     <div className="border border-border rounded-xl overflow-hidden relative">
                         {/* Empty State Overlay */}
-                        {pieces.length === 0 && monthData.status === 'DRAFT' && !generating && (
+                        {pieces.length === 0 && !generating && (
                             <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center">
                                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
                                     <Sparkles className="w-8 h-8 text-primary" />

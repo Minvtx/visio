@@ -581,26 +581,40 @@ export default function ClientDetailPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {client.contentMonths.map((month) => (
-                                        <Link key={month.id} href={`/admin/clients/${client.id}/months/${month.id}`}>
-                                            <Card className="hover:border-primary/50 transition-all cursor-pointer group">
-                                                <CardContent className="p-4 flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
-                                                            <Calendar className="w-5 h-5 text-muted-foreground" />
+                                        <Card key={month.id} className="hover:border-primary/50 transition-all group relative overflow-hidden">
+                                            {/* Full card clickable link */}
+                                            <Link
+                                                href={`/admin/clients/${client.id}/months/${month.id}`}
+                                                className="absolute inset-0 z-10 focus:outline-none"
+                                            >
+                                                <span className="sr-only">Ver mes {MONTH_NAMES[month.month]}</span>
+                                            </Link>
+
+                                            <CardContent className="p-4 flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
+                                                        <Calendar className="w-5 h-5 text-muted-foreground" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-semibold group-hover:text-primary transition-colors">
+                                                            {MONTH_NAMES[month.month]} {month.year}
                                                         </div>
-                                                        <div>
-                                                            <div className="font-semibold group-hover:text-primary transition-colors">
-                                                                {MONTH_NAMES[month.month]} {month.year}
-                                                            </div>
-                                                            <div className="text-sm text-muted-foreground">
-                                                                {month._count?.pieces || 0} piezas
-                                                            </div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {month._count?.pieces || 0} piezas
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <StatusBadge status={month.status} />
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <StatusBadge status={month.status} />
+
+                                                    {/* Actions - elevated z-index to be clickable above the link */}
+                                                    <div className="relative z-20 flex items-center gap-1">
                                                         {month.status === 'EXPORTED' && (
-                                                            <Button variant="ghost" size="sm" onClick={(e) => e.preventDefault()}>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={(e) => e.preventDefault()}
+                                                            >
                                                                 <Download className="w-4 h-4" />
                                                             </Button>
                                                         )}
@@ -613,11 +627,12 @@ export default function ClientDetailPage() {
                                                         >
                                                             <X className="w-4 h-4" />
                                                         </Button>
-                                                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                                     </div>
-                                                </CardContent>
-                                            </Card>
-                                        </Link>
+
+                                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                </div>
+                                            </CardContent>
+                                        </Card>
                                     ))}
                                 </div>
                             )}
