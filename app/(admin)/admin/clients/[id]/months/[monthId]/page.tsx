@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { AssetUploader } from '@/components/assets/asset-uploader'
+import { JobMonitor } from '@/components/jobs/job-monitor'
+import { BrandKitEditor } from '@/components/clients/brand-kit-editor'
 import { StatusBadge } from '@/components/ui/badge'
 import { KanbanBoard } from '@/components/months/kanban-board'
 import {
@@ -139,6 +142,8 @@ export default function ContentMonthPage() {
     const [exporting, setExporting] = useState<string | null>(null)
     const [syncingCalendar, setSyncingCalendar] = useState(false)
     const [activePiece, setActivePiece] = useState<any>(null) // For DragOverlay
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null)
+    const [generating, setGenerating] = useState(false)
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
@@ -231,7 +236,8 @@ export default function ContentMonthPage() {
 
     const handleRegenerate = async () => {
         if (!confirm('¿Seguro que quieres borrar todo el contenido actual y regenerar este mes?')) return
-        setLoading(true)
+        setGenerating(true)
+        setError('')
         try {
             const res = await fetch(`/api/months/${monthId}/generate`, {
                 method: 'POST',
@@ -239,16 +245,28 @@ export default function ContentMonthPage() {
             if (!res.ok) throw new Error('Error al regenerar')
             const data = await res.json()
             if (data.jobId) {
-                // We'll let JobMonitor handle it if it was integrated, but here we just wait or poll
-                alert('Regeneración iniciada. Por favor espera a que termine.')
+                setCurrentJobId(data.jobId)
+            } else {
                 fetchMonth()
+                setGenerating(false)
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err)
-            setError('Error al iniciar regeneración')
-        } finally {
-            setLoading(false)
+            setError(err.message || 'Error al iniciar regeneración')
+            setGenerating(false)
         }
+    }
+
+    const handleJobComplete = async () => {
+        setGenerating(false)
+        setCurrentJobId(null)
+        await fetchMonth()
+    }
+
+    const handleJobError = (err: any) => {
+        setError(typeof err === 'string' ? err : 'Error en la generación')
+        setGenerating(false)
+        setCurrentJobId(null)
     }
 
     const handleDeleteMonth = async () => {
@@ -505,7 +523,24 @@ export default function ContentMonthPage() {
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
-                    <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="border border-border rounded-xl overflow-hidden relative">
+                        {/* Empty State Overlay */}
+                        {pieces.length === 0 && monthData.status === 'DRAFT' && !generating && (
+                            <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center">
+                                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                                    <Sparkles className="w-8 h-8 text-primary" />
+                                </div>
+                                <h3 className="text-xl font-bold mb-2">Este mes está vacío</h3>
+                                <p className="text-muted-foreground max-w-sm mb-6">
+                                    Haz clic en el botón para que la IA genere toda la estrategia y las piezas de contenido automáticamente.
+                                </p>
+                                <Button size="lg" onClick={handleRegenerate} className="shadow-lg shadow-primary/20">
+                                    <Sparkles className="w-4 h-4 mr-2" />
+                                    Generar Todo el Mes
+                                </Button>
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-7 bg-secondary/50">
                             {DAYS.map((day) => (
                                 <div key={day} className="p-3 text-center text-sm font-medium text-muted-foreground border-b border-border">
@@ -595,6 +630,21 @@ export default function ContentMonthPage() {
                             </Card>
                         </Link>
                     ))}
+                </div>
+            )}
+
+            {currentJobId && (
+                <JobMonitor
+                    jobId={currentJobId}
+                    onComplete={handleJobComplete}
+                    onError={handleJobError}
+                />
+            )}
+
+            {generating && !currentJobId && (
+                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+                    <h2 className="text-xl font-bold">Iniciando Content Wizard...</h2>
                 </div>
             )}
         </div>
