@@ -83,17 +83,51 @@ export async function POST(
             // Note: generateStrategy now has internal try/catch fallback, so it shouldn't fail fatally
             const strategy = await generateStrategy(brandContext, monthBrief, plan, client.workspaceId)
 
-            // Save strategy
+            // Normalize: Claude might use different key names for assignments
+            let assignments = strategy.pieceAssignments
+                || strategy.piece_assignments
+                || strategy.assignments
+                || strategy.pieces
+                || strategy.content
+                || []
+
+            // If Claude returned 0 assignments, generate defaults from plan
+            const totalPieces = plan.posts + plan.carousels + plan.reels + plan.stories
+            if (!Array.isArray(assignments) || assignments.length === 0) {
+                console.warn('[Step] Strategy had 0 assignments! Generating defaults...')
+                assignments = []
+                const formats = [
+                    ...Array(plan.posts).fill('POST'),
+                    ...Array(plan.carousels).fill('CAROUSEL'),
+                    ...Array(plan.reels).fill('REEL'),
+                    ...Array(plan.stories).fill('STORY'),
+                ]
+                const pillars = (strategy.pillars || [
+                    { name: 'Educación' }, { name: 'Entretenimiento' }, { name: 'Venta' }
+                ])
+                for (let i = 0; i < formats.length; i++) {
+                    assignments.push({
+                        dayOfMonth: Math.min(28, (i * 2) + 1),
+                        format: formats[i],
+                        pillar: pillars[i % pillars.length]?.name || 'General'
+                    })
+                }
+            }
+
+            // Save strategy with normalized assignments
+            strategy.pieceAssignments = assignments
             await prisma.contentMonth.update({
                 where: { id: params.id },
                 data: { strategy: strategy as object }
             })
 
+            console.log(`[Step] Strategy done. ${assignments.length} assignments ready.`)
+
             return NextResponse.json({
                 success: true,
                 strategy,
-                assignments: strategy.pieceAssignments || [],
-                totalPieces: (strategy.pieceAssignments || []).length
+                assignments,
+                totalPieces: assignments.length
             })
         }
 
