@@ -211,6 +211,23 @@ export default function ContentMonthPage() {
         }
     }
 
+    const handleResetMonth = async () => {
+        if (!confirm('¿Seguro que quieres resetear el estado de este mes? Esto desbloqueará el botón de generación si se quedó trabado.')) return
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/months/${monthId}/reset`, {
+                method: 'POST',
+            })
+            if (!res.ok) throw new Error('Error al resetear')
+            await fetchMonth()
+        } catch (err) {
+            console.error(err)
+            setError('Error al resetear el mes')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handleDragStart = (event: any) => {
         const piece = event.active.data.current
         setActivePiece(piece)
@@ -367,6 +384,16 @@ export default function ContentMonthPage() {
                     <Button onClick={() => { }}>
                         <Sparkles className="w-4 h-4 mr-2" />
                         Mejorar con IA
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleResetMonth}
+                        className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                        title="Resetear estado si se quedó trabado en Generando"
+                    >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Reset Estado
                     </Button>
                 </div>
             </div>
