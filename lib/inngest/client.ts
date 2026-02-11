@@ -1,7 +1,7 @@
 import { Inngest } from "inngest";
 
-// Creamos un ID nuevo para forzar una sincronización limpia
+// Volvemos al ID original que tenés en el Dashboard
 export const inngest = new Inngest({
-    id: "visio-studio-v1",
+    id: "visio",
     name: "Visio Content Studio"
 });
