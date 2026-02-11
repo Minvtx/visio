@@ -91,6 +91,11 @@ export async function generateMonthProcessor(job: Job) {
 
     // 6. Save Results to Database
     await prisma.$transaction(async (tx) => {
+        // Delete existing pieces if any (allows regeneration)
+        await tx.contentPiece.deleteMany({
+            where: { contentMonthId: monthId }
+        });
+
         // Update ContentMonth with strategy
         await tx.contentMonth.update({
             where: { id: monthId },

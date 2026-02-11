@@ -19,7 +19,8 @@ import {
     FileSpreadsheet,
     FileJson,
     ChevronDown,
-    LayoutGrid
+    LayoutGrid,
+    X
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -228,6 +229,44 @@ export default function ContentMonthPage() {
         }
     }
 
+    const handleRegenerate = async () => {
+        if (!confirm('¿Seguro que quieres borrar todo el contenido actual y regenerar este mes?')) return
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/months/${monthId}/generate`, {
+                method: 'POST',
+            })
+            if (!res.ok) throw new Error('Error al regenerar')
+            const data = await res.json()
+            if (data.jobId) {
+                // We'll let JobMonitor handle it if it was integrated, but here we just wait or poll
+                alert('Regeneración iniciada. Por favor espera a que termine.')
+                fetchMonth()
+            }
+        } catch (err) {
+            console.error(err)
+            setError('Error al iniciar regeneración')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleDeleteMonth = async () => {
+        if (!confirm('¿Seguro que quieres ELIMINAR este mes? Se borrará todo el contenido, estrategia y feedback permanentemente.')) return
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/months/${monthId}`, {
+                method: 'DELETE',
+            })
+            if (!res.ok) throw new Error('Error al eliminar')
+            window.location.href = `/admin/clients/${clientId}`
+        } catch (err) {
+            console.error(err)
+            setError('No se pudo eliminar el mes')
+            setLoading(false)
+        }
+    }
+
     const handleDragStart = (event: any) => {
         const piece = event.active.data.current
         setActivePiece(piece)
@@ -355,9 +394,17 @@ export default function ContentMonthPage() {
                         )}
                         Sincronizar Calendar
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleRegenerate}>
                         <RotateCcw className="w-4 h-4 mr-2" />
-                        Regenerar
+                        Regenerar Todo
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={handleDeleteMonth}
+                        className="border-red-500/30 text-red-600 hover:bg-red-500/5"
+                    >
+                        <X className="w-4 h-4 mr-2" />
+                        Eliminar Mes
                     </Button>
                     <div className="relative">
                         <Button
