@@ -253,10 +253,30 @@ export default function ClientDetailPage() {
                 return
             }
 
-            const data = await generateRes.json()
-            setCurrentJobId(data.jobId)
+            // Inngest returns instantly. Poll for completion.
+            const pollInterval = setInterval(async () => {
+                try {
+                    const pollRes = await fetch(`/api/months/${createdMonthId}`)
+                    if (pollRes.ok) {
+                        const data = await pollRes.json()
+                        if (data.status !== 'GENERATING') {
+                            clearInterval(pollInterval)
+                            setGenerating(false)
+                            setCreatedMonthId(null)
+                            await fetchClient()
+                        }
+                    }
+                } catch (e) {
+                    console.error('Poll error:', e)
+                }
+            }, 3000)
 
-            // We keep generating=true to block other actions, but the JobMonitor will handle the overlay/feedback
+            // Safety timeout: 3 minutes
+            setTimeout(() => {
+                clearInterval(pollInterval)
+                setGenerating(false)
+                setError('La generación está tomando más tiempo del esperado. Actualizá la página para ver el resultado.')
+            }, 180000)
 
         } catch (error) {
             console.error(error)

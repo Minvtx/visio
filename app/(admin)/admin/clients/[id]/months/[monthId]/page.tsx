@@ -238,49 +238,51 @@ export default function ContentMonthPage() {
         if (!confirm('¿Seguro que quieres borrar todo el contenido actual y generar este mes?')) return
         setGenerating(true)
         setError('')
-        setLoading(true)
 
         try {
-            // 1. Reset state
+            // 1. Reset state first (clear old pieces)
             await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
 
-            // 2. Start Strategy
-            const resStrat = await fetch(`/api/months/${monthId}/generate-step`, {
+            // 2. Trigger Inngest background job (returns instantly)
+            const res = await fetch(`/api/months/${monthId}/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ step: 'strategy' })
             })
-            if (!resStrat.ok) throw new Error('Error al iniciar estrategia')
 
-            // 3. Generate pieces one by one (Incremental)
-            let currentIdx = 0
-            let completed = false
-            const total = monthData.client?.plan?.postsPerMonth || 12
-
-            while (!completed && currentIdx < 30) { // Limit 30 to avoid infinite loops
-                const resPiece = await fetch(`/api/months/${monthId}/generate-step`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ step: 'piece', pieceIndex: currentIdx })
-                })
-
-                if (!resPiece.ok) throw new Error(`Error en pieza ${currentIdx}`)
-
-                const data = await resPiece.json()
-                completed = data.completed
-                currentIdx = data.nextIndex
-
-                // Update progress visually if we had a state for it
-                console.log(`Progreso: ${data.progress}%`)
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.error || 'Error al iniciar generación')
             }
 
-            await fetchMonth()
+            // 3. Poll every 3 seconds until the month status changes from GENERATING
+            const pollInterval = setInterval(async () => {
+                try {
+                    const pollRes = await fetch(`/api/months/${monthId}`)
+                    if (pollRes.ok) {
+                        const data = await pollRes.json()
+                        if (data.status !== 'GENERATING') {
+                            clearInterval(pollInterval)
+                            setGenerating(false)
+                            setMonthData(data)
+                        }
+                    }
+                } catch (e) {
+                    console.error('Poll error:', e)
+                }
+            }, 3000)
+
+            // Safety: stop polling after 3 minutes max
+            setTimeout(() => {
+                clearInterval(pollInterval)
+                if (generating) {
+                    setError('La generación está tomando más tiempo del esperado. Refresh para ver si terminó.')
+                    setGenerating(false)
+                }
+            }, 180000)
+
         } catch (err: any) {
             console.error(err)
-            setError(err.message || 'Error en la generación incremental')
-        } finally {
+            setError(err.message || 'Error al iniciar generación')
             setGenerating(false)
-            setLoading(false)
         }
     }
 
