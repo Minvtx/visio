@@ -37,7 +37,8 @@ export async function POST(
                 // 1. Load Data
                 const month = await prisma.contentMonth.findUnique({
                     where: { id: monthId },
-                    include: { client: { include: { brandCore: true, targetAudiences: true, products: true } } }
+                    // FIX: products and targetAudiences are inside KnowledgeBase
+                    include: { client: { include: { brandKit: true, knowledgeBase: true } } }
                 })
 
                 if (!month || !month.client) {
@@ -45,7 +46,7 @@ export async function POST(
                 }
 
                 // 2. Reset pieces (optional context-dependent, but safer here)
-                await prisma.contentPiece.deleteMany({ where: { monthId: monthId } })
+                await prisma.contentPiece.deleteMany({ where: { contentMonthId: monthId } })
 
                 // 3. Generate Strategy
                 send({ type: 'status', message: '🧠 Analizando marca y estrategia...', progress: 5 })
@@ -55,18 +56,19 @@ export async function POST(
                 const brandContext: any = {
                     name: month.client.name,
                     industry: month.client.industry,
-                    about: month.client.brandCore?.mission || '',
-                    primaryTone: month.client.brandCore?.voiceTone || 'Profesional',
-                    brandPersonality: month.client.brandCore?.brandPersonality || [],
-                    products: month.client.products || [],
-                    targetAudiences: month.client.targetAudiences || [],
+                    // FIX: Map fields from brandKit model correctly
+                    about: month.client.brandKit?.missionStatement || month.client.description || '',
+                    primaryTone: month.client.brandKit?.primaryTone || month.client.brandKit?.tone || 'Profesional',
+                    brandPersonality: month.client.brandKit?.brandPersonality || [],
+                    products: month.client.knowledgeBase?.products || [],
+                    targetAudiences: month.client.knowledgeBase?.targetAudiences || [],
                 }
 
                 const monthBrief: any = {
                     month: month.month,
                     year: month.year,
-                    primaryObjective: month.focus || 'Engagement',
-                    additionalContext: month.context || ''
+                    primaryObjective: month.primaryObjective || 'Engagement', // FIX: Use correct field name from schema
+                    additionalContext: month.specificGoal || '' // FIX: specificGoal instead of context
                 }
 
                 console.log('[Stream] Calling generateStrategy...')
@@ -117,23 +119,22 @@ export async function POST(
                         // Save piece
                         await prisma.contentPiece.create({
                             data: {
-                                monthId: monthId,
+                                contentMonthId: monthId,
                                 title: pieceData.topic,
-                                format: pieceData.format,
-                                concept: pieceData.topic,
+                                type: pieceData.format as any, // FIX: type vs format
                                 pillar: pieceData.pillar,
                                 status: 'DRAFT',
                                 suggestedDate: new Date(month.year, month.month - 1, pieceData.dayOfMonth).toISOString(),
-                                content: {
+                                copy: { // FIX: content -> copy in Prisma Schema
                                     hooks: pieceData.hooks,
-                                    body: pieceData.captionLong,
-                                    cta: pieceData.ctas?.[0],
-                                    hashtags: pieceData.hashtags
+                                    captionLong: pieceData.captionLong,
+                                    captionShort: pieceData.captionShort,
+                                    ctas: pieceData.ctas
                                 },
+                                hashtags: pieceData.hashtags || [], // FIX: hashtags array separate
                                 visualBrief: pieceData.visualBrief,
                                 metadata: {
-                                    carouselSlides: pieceData.carouselSlides,
-                                    captionShort: pieceData.captionShort
+                                    carouselSlides: pieceData.carouselSlides
                                 }
                             }
                         })
