@@ -131,7 +131,7 @@ Solo JSON, sin texto adicional.`
 
     try {
         const response = await client.messages.create({
-            model: 'claude-3-5-sonnet-latest',
+            model: req.model || 'claude-3-haiku-20240307',
             max_tokens: 3000,
             temperature: 0.7,
             messages: [{ role: 'user', content: prompt }]
@@ -222,7 +222,7 @@ Solo JSON, sin texto adicional.`
 
     try {
         const response = await client.messages.create({
-            model: 'claude-3-5-sonnet-latest',
+            model: 'claude-3-haiku-20240307',
             max_tokens: 3000,
             temperature: 0.7,
             messages: [{ role: 'user', content: prompt }]
