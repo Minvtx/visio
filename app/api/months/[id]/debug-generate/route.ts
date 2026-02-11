@@ -79,11 +79,15 @@ export async function GET(
             additionalContext: month.specificGoal || '',
             activeCampaigns: month.activeCampaigns || []
         }
-        log('Brand context built OK')
+        log(`Brand context built OK: ${JSON.stringify(brandContext).substring(0, 200)}...`)
 
         // 4. Check API Key
         const envKey = process.env.ANTHROPIC_API_KEY
-        log(`ENV ANTHROPIC_API_KEY present: ${!!envKey}, length: ${envKey?.length || 0}, starts with: ${envKey?.substring(0, 10) || 'N/A'}...`)
+        log(`ENV ANTHROPIC_API_KEY present: ${!!envKey}, length: ${envKey?.length || 0}`)
+
+        if (!envKey) {
+            log('WARNING: Global ANTHROPIC_API_KEY missing. If workspace keys are also missing, this will fail.')
+        }
 
         // 5. Test Strategy Generation
         log('--- Testing Strategy Generation ---')
@@ -91,21 +95,20 @@ export async function GET(
 
         let strategy: any
         try {
-            strategy = await generateStrategy(brandContext as any, monthBrief, plan, client.workspaceId)
-            log(`Strategy result: ${JSON.stringify(strategy).substring(0, 300)}...`)
+            log('Calling generateStrategy...')
+            strategy = await generateStrategy(brandContext as any, monthBrief as any, plan, client.workspaceId)
+            log(`Strategy SUCCESS. Objective: ${strategy.monthlyObjective}`)
 
-            // Check assignments
+            // Normalize assignments
             const assignments = strategy.pieceAssignments
                 || strategy.piece_assignments
                 || strategy.assignments
                 || strategy.pieces
                 || []
             log(`Assignments found: ${assignments.length}`)
-            if (assignments.length > 0) {
-                log(`First assignment: ${JSON.stringify(assignments[0])}`)
-            }
         } catch (e: any) {
             log(`Strategy FAILED: ${e.message}`)
+            log(`Error stack: ${e.stack}`)
             return NextResponse.json({ success: false, error: `Strategy failed: ${e.message}`, logs })
         }
 
@@ -113,6 +116,7 @@ export async function GET(
         log('--- Testing Single Piece Generation ---')
         let piece: any
         try {
+            log('Calling generateSinglePiece (POST)...')
             piece = await generateSinglePiece({
                 brand: brandContext as any,
                 brief: monthBrief,
@@ -122,11 +126,10 @@ export async function GET(
                 pieceNumber: 1,
                 totalPieces: 1,
             }, client.workspaceId)
-            log(`Piece generated: ${JSON.stringify(piece).substring(0, 300)}...`)
-            log(`Piece fields: topic=${piece.topic}, format=${piece.format}, pillar=${piece.pillar}`)
+            log(`Piece generated SUCCESS: ${piece.topic}`)
         } catch (e: any) {
             log(`Piece generation FAILED: ${e.message}`)
-            log(`Full error: ${e.toString()}`)
+            log(`Error details: ${e.toString()}`)
             return NextResponse.json({ success: false, error: `Piece generation failed: ${e.message}`, logs })
         }
 

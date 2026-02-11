@@ -20,6 +20,29 @@ interface PieceRequest {
     totalPieces: number
 }
 
+/**
+ * Robust JSON extraction from AI responses. 
+ * Finds the first `{` and last `}` and tries to parse what's in between.
+ */
+function extractJson(text: string): any {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+        throw new Error("No se encontró un JSON válido en la respuesta de la IA.");
+    }
+
+    let cleaned = jsonMatch[0];
+
+    // Sometimes AI includes markdown markers inside the match if it's messy
+    cleaned = cleaned.replace(/^```json/, '').replace(/```$/, '').trim();
+
+    try {
+        return JSON.parse(cleaned);
+    } catch (e) {
+        console.error("[JSON Extract Error] Failed to parse cleaned text:", cleaned);
+        throw e;
+    }
+}
+
 export async function generateSinglePiece(
     req: PieceRequest,
     workspaceId?: string
@@ -107,23 +130,13 @@ Solo JSON, sin texto adicional.`
             throw new Error('No text response from Claude')
         }
 
-        let jsonText = (textContent as any).text.trim()
-
-        // Log raw for debug
-        // console.log('[DEBUG] Raw AI Response:', jsonText.substring(0, 100) + '...')
-
-        // Cleanup markdown
-        if (jsonText.startsWith('```json')) {
-            jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '')
-        } else if (jsonText.startsWith('```')) {
-            jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
-        }
+        const rawText = (textContent as any).text.trim()
 
         try {
-            return JSON.parse(jsonText.trim()) as GeneratedPiece
-        } catch (parseError) {
-            console.error('[JSON PARSE ERROR] Raw text:', jsonText)
-            throw new Error('La IA no devolvió un JSON válido. Revisa los logs.')
+            return extractJson(rawText) as GeneratedPiece
+        } catch (parseError: any) {
+            console.error('[GENERATE PIECE PARSE ERROR] Raw text:', rawText.substring(0, 500))
+            throw new Error(`La IA no devolvió un formato válido: ${parseError.message}`)
         }
 
     } catch (e: any) {
@@ -209,11 +222,14 @@ Solo JSON, sin texto adicional.`
         const textContent = response.content.find(c => c.type === 'text')
         if (!textContent || textContent.type !== 'text') throw new Error('No response content from Claude')
 
-        let jsonText = (textContent as any).text.trim()
-        if (jsonText.startsWith('```json')) jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '')
-        else if (jsonText.startsWith('```')) jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
+        const rawText = (textContent as any).text.trim()
 
-        return JSON.parse(jsonText)
+        try {
+            return extractJson(rawText)
+        } catch (parseError: any) {
+            console.error('[GENERATE STRATEGY PARSE ERROR] Raw text:', rawText.substring(0, 500))
+            throw parseError
+        }
     } catch (e: any) {
         console.error('[STRATEGY ERROR] Failed to generate strategy:', e)
         // Fallback Strategy so process doesn't die
