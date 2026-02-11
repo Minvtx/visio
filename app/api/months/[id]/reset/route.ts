@@ -4,8 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
- * API de Emergencia para resetear un mes trabado
- * POST /api/months/[id]/reset
+ * POST /api/months/[id]/reset - Reset a stuck month back to DRAFT
+ * Clears all pieces and resets status
  */
 export async function POST(
     request: NextRequest,
@@ -13,27 +13,46 @@ export async function POST(
 ) {
     try {
         const session = await getServerSession(authOptions)
-
         if (!session?.user || session.user.role !== 'ADMIN') {
             return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
         }
 
-        // Devolver a DRAFT y limpiar Jobs pendientes para este recurso
-        await prisma.$transaction([
-            prisma.contentMonth.update({
-                where: { id: params.id },
-                data: { status: 'DRAFT' }
-            }),
-            prisma.job.updateMany({
-                where: {
-                    resourceId: params.id,
-                    status: { in: ['QUEUED', 'RUNNING'] }
-                },
-                data: { status: 'FAILED', error: 'Reset manual del usuario' }
-            })
-        ]);
+        const month = await prisma.contentMonth.findUnique({
+            where: { id: params.id },
+        })
 
-        return NextResponse.json({ success: true, message: 'Estado reseteado correctamente' })
+        if (!month) {
+            return NextResponse.json({ error: 'Mes no encontrado' }, { status: 404 })
+        }
+
+        // Delete all existing pieces
+        const deleted = await prisma.contentPiece.deleteMany({
+            where: { contentMonthId: params.id }
+        })
+
+        // Reset month status to DRAFT
+        await prisma.contentMonth.update({
+            where: { id: params.id },
+            data: {
+                status: 'DRAFT',
+                generatedAt: null,
+            }
+        })
+
+        // Mark any stuck jobs as failed
+        await prisma.job.updateMany({
+            where: {
+                payload: { path: ['monthId'], equals: params.id },
+                status: { in: ['QUEUED', 'RUNNING'] }
+            },
+            data: { status: 'FAILED' }
+        })
+
+        return NextResponse.json({
+            success: true,
+            piecesDeleted: deleted.count,
+            message: 'Mes reseteado a borrador'
+        })
 
     } catch (error) {
         console.error('Error resetting month:', error)
