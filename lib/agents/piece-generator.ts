@@ -57,33 +57,44 @@ export async function generateSinglePiece(
             const keys = await getWorkspaceApiKeys(workspaceId)
             if (keys?.anthropic) {
                 apiKey = keys.anthropic
-                console.log('[DEBUG] Using workspace specific key')
+                const mask = apiKey.substring(0, 5) + '...' + apiKey.substring(apiKey.length - 4)
+                console.log(`[DEBUG] Using workspace key: ${mask}`)
+            } else {
+                console.log('[DEBUG] Workspace exists but has no custom Anthropic key.')
             }
         } catch (e) {
             console.error('[ERROR] Failed to fetch workspace keys:', e)
         }
     }
 
-    if (!apiKey) {
+    if (!apiKey || apiKey.trim() === '') {
         console.error('[CRITICAL] No API Key found for Anthropic')
-        throw new Error('No hay API Key de Anthropic configurada. Verificá las variables de entorno.')
+        throw new Error('No hay API Key de Anthropic configurada. Por favor, configúrala en el Workspace o en las variables de entorno.')
     }
 
     const client = new Anthropic({ apiKey })
 
     const monthName = MONTH_NAMES[req.brief.month - 1]
 
+    const products = Array.isArray(req.brand.products)
+        ? req.brand.products.filter(p => p && (p.name || p.description)).map(p => p.name).join(', ')
+        : 'Información general'
+
+    const audiences = Array.isArray(req.brand.targetAudiences)
+        ? req.brand.targetAudiences.filter(a => a && (a.name || a.description)).map(a => `${a.name}: ${a.description}`).join('; ')
+        : 'Público general'
+
     const prompt = `Eres un copywriter experto para redes sociales en español latinoamericano.
 
-MARCA: ${req.brand.name}
-INDUSTRIA: ${req.brand.industry}
-SOBRE: ${req.brand.about}
-TONO: ${req.brand.primaryTone}
+MARCA: ${req.brand.name || 'La Marca'}
+INDUSTRIA: ${req.brand.industry || 'General'}
+SOBRE: ${req.brand.about || 'Descripción no disponible'}
+TONO: ${req.brand.primaryTone || 'Profesional'}
 HABLA COMO: ${req.brand.speakingAs || 'nosotros'}
 EMOJIS: ${req.brand.emojiUsage || 'moderado'}
-PERSONALIDAD: ${req.brand.brandPersonality?.join(', ') || 'Profesional'}
-${req.brand.products?.length ? 'PRODUCTOS: ' + req.brand.products.map(p => p.name).join(', ') : ''}
-${req.brand.targetAudiences?.length ? 'AUDIENCIA: ' + req.brand.targetAudiences.map(a => a.name + ': ' + a.description).join('; ') : ''}
+PERSONALIDAD: ${Array.isArray(req.brand.brandPersonality) ? req.brand.brandPersonality.join(', ') : 'Profesional'}
+PRODUCTOS: ${products}
+AUDIENCIA: ${audiences}
 
 MES: ${monthName} ${req.brief.year}
 OBJETIVO: ${req.brief.primaryObjective || 'Engagement'}
@@ -158,25 +169,22 @@ export async function generateStrategy(
     workspaceId?: string
 ) {
     let apiKey = process.env.ANTHROPIC_API_KEY
-
-    // Log key presence for debugging
-    console.log('[DEBUG] Generating strategy. Env Key present:', !!apiKey)
-
     if (workspaceId) {
         try {
             const keys = await getWorkspaceApiKeys(workspaceId)
             if (keys?.anthropic) {
                 apiKey = keys.anthropic
-                console.log('[DEBUG] Using workspace specific key for strategy')
+                const mask = apiKey.substring(0, 5) + '...' + apiKey.substring(apiKey.length - 4)
+                console.log(`[DEBUG] Strategy: Using workspace key: ${mask}`)
             }
         } catch (e) {
             console.error('[ERROR] Failed to fetch workspace keys for strategy:', e)
         }
     }
 
-    if (!apiKey) {
+    if (!apiKey || apiKey.trim() === '') {
         console.error('[CRITICAL] No API Key found for Anthropic (Strategy)')
-        throw new Error('No hay API Key de Anthropic configurada. Verificá las variables de entorno.')
+        throw new Error('No hay API Key de Anthropic configurada. Por favor, configúrala en el Workspace.')
     }
 
     const client = new Anthropic({ apiKey })
@@ -185,8 +193,8 @@ export async function generateStrategy(
 
     const prompt = `Eres un estratega de contenido para redes sociales en español.
 
-MARCA: ${brand.name} | INDUSTRIA: ${brand.industry}
-SOBRE: ${brand.about}
+MARCA: ${brand.name || 'La Marca'} | INDUSTRIA: ${brand.industry || 'General'}
+SOBRE: ${brand.about || 'Descripción no disponible'}
 MES: ${monthName} ${brief.year}
 OBJETIVO: ${brief.primaryObjective || 'Aumentar engagement'}
 TOTAL PIEZAS: ${totalPieces} (${plan.posts} posts, ${plan.carousels} carruseles, ${plan.reels} reels, ${plan.stories} stories)
