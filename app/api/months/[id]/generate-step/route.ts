@@ -164,30 +164,39 @@ export async function POST(
             // Get status
             const suggestedDate = new Date(month.year, month.month - 1, piece.dayOfMonth)
 
+            // Validate Format (Enum)
+            const validFormats = ['POST', 'CAROUSEL', 'REEL', 'STORY', 'THREAD'];
+            let safeFormat = (piece.format || 'POST').toString().toUpperCase();
+            if (!validFormats.includes(safeFormat)) safeFormat = 'POST';
+
             // Save piece to DB immediately
-            await prisma.contentPiece.create({
-                data: {
-                    contentMonthId: params.id,
-                    type: piece.format as any, // Cast to enum
-                    title: piece.topic,
-                    pillar: piece.pillar,
-                    // Use 'copy' JSON field
-                    copy: {
-                        hooks: piece.hooks,
-                        captionLong: piece.captionLong,
-                        captionShort: piece.captionShort,
-                        ctas: piece.ctas,
-                    },
-                    hashtags: piece.hashtags || [],
-                    visualBrief: piece.visualBrief,
-                    suggestedDate: suggestedDate.toISOString(),
-                    status: 'DRAFT',
-                    order: pieceNumber,
-                    metadata: {
-                        carouselSlides: piece.carouselSlides || null,
+            try {
+                await prisma.contentPiece.create({
+                    data: {
+                        contentMonthId: params.id,
+                        type: safeFormat as any,
+                        title: piece.topic || 'Sin título',
+                        pillar: piece.pillar || 'General',
+                        copy: {
+                            hooks: piece.hooks || [],
+                            captionLong: piece.captionLong || '',
+                            captionShort: piece.captionShort || '',
+                            ctas: piece.ctas || [],
+                        },
+                        hashtags: piece.hashtags || [],
+                        visualBrief: piece.visualBrief || '',
+                        suggestedDate: suggestedDate, // Pass Date object
+                        status: 'DRAFT',
+                        order: pieceNumber,
+                        metadata: {
+                            carouselSlides: piece.carouselSlides || null,
+                        }
                     }
-                }
-            })
+                })
+            } catch (dbError: any) {
+                console.error('[DB Insert Error]', dbError)
+                throw new Error(`Error guardando pieza en DB: ${dbError.message}`)
+            }
 
             return NextResponse.json({
                 success: true,
