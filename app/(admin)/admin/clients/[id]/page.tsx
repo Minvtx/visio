@@ -119,8 +119,10 @@ export default function ClientDetailPage() {
         year: new Date().getFullYear(),
     })
     const [error, setError] = useState('')
-    const [currentJobId, setCurrentJobId] = useState<string | null>(null)
     const [initializingDrive, setInitializingDrive] = useState(false)
+    const [genProgress, setGenProgress] = useState(0)
+    const [genStatus, setGenStatus] = useState('')
+    const [genPieceCount, setGenPieceCount] = useState({ done: 0, total: 0 })
 
     useEffect(() => {
         fetchClient()
@@ -240,62 +242,74 @@ export default function ClientDetailPage() {
         if (!createdMonthId) return
         setGenerating(true)
         setShowStrategyModal(false)
+        setGenProgress(0)
+        setGenStatus('Preparando...')
+        setGenPieceCount({ done: 0, total: 0 })
 
         try {
-            const generateRes = await fetch(`/api/months/${createdMonthId}/generate`, {
+            // 1. Generate strategy with Claude (~5s)
+            setGenStatus('🎯 Generando estrategia mensual con IA...')
+            const stratRes = await fetch(`/api/months/${createdMonthId}/generate-step`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 'strategy' })
             })
 
-            if (!generateRes.ok) {
-                const data = await generateRes.json()
-                setError(data.error || 'Error al generar contenido')
-                setGenerating(false)
-                return
+            if (!stratRes.ok) {
+                const errData = await stratRes.json()
+                throw new Error(errData.error || 'Error al generar estrategia')
             }
 
-            // Inngest returns instantly. Poll for completion.
-            const pollInterval = setInterval(async () => {
-                try {
-                    const pollRes = await fetch(`/api/months/${createdMonthId}`)
-                    if (pollRes.ok) {
-                        const data = await pollRes.json()
-                        if (data.status !== 'GENERATING') {
-                            clearInterval(pollInterval)
-                            setGenerating(false)
-                            setCreatedMonthId(null)
-                            await fetchClient()
-                        }
-                    }
-                } catch (e) {
-                    console.error('Poll error:', e)
+            const stratData = await stratRes.json()
+            const assignments = stratData.assignments || []
+            const total = assignments.length
+            setGenPieceCount({ done: 0, total })
+            setGenProgress(5)
+
+            // 2. Generate each piece one by one
+            for (let i = 0; i < assignments.length; i++) {
+                const assignment = assignments[i]
+                setGenStatus(`✍️ Pieza ${i + 1}/${total}: ${assignment.format} - ${assignment.pillar}`)
+
+                const pieceRes = await fetch(`/api/months/${createdMonthId}/generate-step`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        step: 'piece',
+                        assignment,
+                        pieceNumber: i + 1,
+                        totalPieces: total
+                    })
+                })
+
+                if (!pieceRes.ok) {
+                    console.error(`Failed piece ${i + 1}, skipping...`)
+                    continue
                 }
-            }, 3000)
 
-            // Safety timeout: 3 minutes
-            setTimeout(() => {
-                clearInterval(pollInterval)
-                setGenerating(false)
-                setError('La generación está tomando más tiempo del esperado. Actualizá la página para ver el resultado.')
-            }, 180000)
+                setGenPieceCount({ done: i + 1, total })
+                setGenProgress(5 + Math.round(((i + 1) / total) * 90))
+            }
 
-        } catch (error) {
+            // 3. Finalize
+            setGenStatus('✅ Finalizando...')
+            await fetch(`/api/months/${createdMonthId}/generate-step`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 'finalize' })
+            })
+
+            setGenProgress(100)
+            setGenStatus('🎉 ¡Contenido generado!')
+            setCreatedMonthId(null)
+            await fetchClient()
+
+        } catch (error: any) {
             console.error(error)
-            setGenerating(false)
-            setError('Error fatal al generar')
+            setError(error.message || 'Error fatal al generar')
+        } finally {
+            setTimeout(() => setGenerating(false), 1500)
         }
-    }
-
-    const handleJobComplete = async () => {
-        setGenerating(false)
-        setCurrentJobId(null)
-        setCreatedMonthId(null)
-        await fetchClient()
-    }
-
-    const handleJobError = (err: any) => {
-        setError(typeof err === 'string' ? err : 'Error en la generación')
-        setGenerating(false)
-        setCurrentJobId(null)
     }
 
     if (loading) {
@@ -742,27 +756,35 @@ export default function ClientDetailPage() {
 
                     {/* Full Screen Loading Overlay when generating */}
                     {generating && !showGenerateModal && !showStrategyModal && (
-                        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-                            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 animate-pulse">
-                                <Sparkles className="w-10 h-10 text-primary animate-spin" />
+                        <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                            <div className="w-full max-w-md p-8">
+                                <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 mx-auto animate-pulse">
+                                    <Sparkles className="w-10 h-10 text-primary" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-center mb-2">Content Wizard trabajando...</h2>
+
+                                <div className="w-full bg-secondary rounded-full h-3 mb-3 overflow-hidden">
+                                    <div
+                                        className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
+                                        style={{ width: `${genProgress}%` }}
+                                    />
+                                </div>
+
+                                <div className="flex justify-between text-sm text-muted-foreground mb-4">
+                                    <span>{genStatus}</span>
+                                    <span className="font-medium">{genProgress}%</span>
+                                </div>
+
+                                {genPieceCount.total > 0 && (
+                                    <div className="text-center text-sm text-muted-foreground">
+                                        {genPieceCount.done} de {genPieceCount.total} piezas generadas
+                                    </div>
+                                )}
                             </div>
-                            <h2 className="text-2xl font-bold mb-2">Content Wizard trabajando...</h2>
-                            <p className="text-muted-foreground max-w-md text-center">
-                                Analizando estrategia, buscando tendencias y escribiendo copys persuasivos para tu cliente.
-                            </p>
-                            <div className="mt-8 text-sm text-muted-foreground">Esto puede tomar hasta 60 segundos</div>
                         </div>
                     )}
 
                 </>
-            )}
-
-            {currentJobId && (
-                <JobMonitor
-                    jobId={currentJobId}
-                    onComplete={handleJobComplete}
-                    onError={handleJobError}
-                />
             )}
 
             {/* Plan Selection Modal */}

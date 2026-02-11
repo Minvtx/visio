@@ -141,9 +141,11 @@ export default function ContentMonthPage() {
     const [showExportMenu, setShowExportMenu] = useState(false)
     const [exporting, setExporting] = useState<string | null>(null)
     const [syncingCalendar, setSyncingCalendar] = useState(false)
-    const [activePiece, setActivePiece] = useState<any>(null) // For DragOverlay
-    const [currentJobId, setCurrentJobId] = useState<string | null>(null)
+    const [activePiece, setActivePiece] = useState<any>(null)
     const [generating, setGenerating] = useState(false)
+    const [genProgress, setGenProgress] = useState(0)
+    const [genStatus, setGenStatus] = useState('')
+    const [genPieceCount, setGenPieceCount] = useState({ done: 0, total: 0 })
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
@@ -238,64 +240,80 @@ export default function ContentMonthPage() {
         if (!confirm('¿Seguro que quieres borrar todo el contenido actual y generar este mes?')) return
         setGenerating(true)
         setError('')
+        setGenProgress(0)
+        setGenStatus('Preparando...')
+        setGenPieceCount({ done: 0, total: 0 })
 
         try {
-            // 1. Reset state first (clear old pieces)
+            // 1. Reset (clear old pieces)
+            setGenStatus('Limpiando contenido anterior...')
             await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
 
-            // 2. Trigger Inngest background job (returns instantly)
-            const res = await fetch(`/api/months/${monthId}/generate`, {
+            // 2. Generate strategy with Claude
+            setGenStatus('🎯 Generando estrategia mensual con IA...')
+            const stratRes = await fetch(`/api/months/${monthId}/generate-step`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 'strategy' })
             })
 
-            if (!res.ok) {
-                const data = await res.json()
-                throw new Error(data.error || 'Error al iniciar generación')
+            if (!stratRes.ok) {
+                const errData = await stratRes.json()
+                throw new Error(errData.error || 'Error al generar estrategia')
             }
 
-            // 3. Poll every 3 seconds until the month status changes from GENERATING
-            const pollInterval = setInterval(async () => {
-                try {
-                    const pollRes = await fetch(`/api/months/${monthId}`)
-                    if (pollRes.ok) {
-                        const data = await pollRes.json()
-                        if (data.status !== 'GENERATING') {
-                            clearInterval(pollInterval)
-                            setGenerating(false)
-                            setMonthData(data)
-                        }
-                    }
-                } catch (e) {
-                    console.error('Poll error:', e)
-                }
-            }, 3000)
+            const stratData = await stratRes.json()
+            const assignments = stratData.assignments || []
+            const total = assignments.length
+            setGenPieceCount({ done: 0, total })
+            setGenProgress(5) // Strategy = 5%
 
-            // Safety: stop polling after 3 minutes max
-            setTimeout(() => {
-                clearInterval(pollInterval)
-                if (generating) {
-                    setError('La generación está tomando más tiempo del esperado. Refresh para ver si terminó.')
-                    setGenerating(false)
+            // 3. Generate each piece one by one
+            for (let i = 0; i < assignments.length; i++) {
+                const assignment = assignments[i]
+                setGenStatus(`✍️ Generando pieza ${i + 1}/${total}: ${assignment.format} - ${assignment.pillar}`)
+
+                const pieceRes = await fetch(`/api/months/${monthId}/generate-step`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        step: 'piece',
+                        assignment,
+                        pieceNumber: i + 1,
+                        totalPieces: total
+                    })
+                })
+
+                if (!pieceRes.ok) {
+                    console.error(`Failed piece ${i + 1}, skipping...`)
+                    continue // Skip failed pieces, don't break the loop
                 }
-            }, 180000)
+
+                const pieceData = await pieceRes.json()
+                setGenPieceCount({ done: i + 1, total })
+                setGenProgress(5 + Math.round(((i + 1) / total) * 90)) // 5-95%
+            }
+
+            // 4. Finalize
+            setGenStatus('✅ Finalizando...')
+            await fetch(`/api/months/${monthId}/generate-step`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 'finalize' })
+            })
+
+            setGenProgress(100)
+            setGenStatus('🎉 ¡Contenido generado!')
+
+            // Refresh data
+            await fetchMonth()
 
         } catch (err: any) {
             console.error(err)
-            setError(err.message || 'Error al iniciar generación')
-            setGenerating(false)
+            setError(err.message || 'Error en la generación')
+        } finally {
+            setTimeout(() => setGenerating(false), 1500) // Show 100% briefly
         }
-    }
-
-    const handleJobComplete = async () => {
-        setGenerating(false)
-        setCurrentJobId(null)
-        await fetchMonth()
-    }
-
-    const handleJobError = (err: any) => {
-        setError(typeof err === 'string' ? err : 'Error en la generación')
-        setGenerating(false)
-        setCurrentJobId(null)
     }
 
     const handleDeleteMonth = async () => {
@@ -662,26 +680,32 @@ export default function ContentMonthPage() {
                 </div>
             )}
 
-            {currentJobId && (
-                <JobMonitor
-                    jobId={currentJobId}
-                    onComplete={handleJobComplete}
-                    onError={handleJobError}
-                />
-            )}
+            {generating && (
+                <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                    <div className="w-full max-w-md p-8">
+                        <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 mx-auto animate-pulse">
+                            <Sparkles className="w-10 h-10 text-primary" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-center mb-2">Content Wizard trabajando...</h2>
 
-            {generating && !currentJobId && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-                    <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 animate-pulse">
-                        <Sparkles className="w-10 h-10 text-primary animate-spin" />
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2">Content Wizard trabajando...</h2>
-                    <p className="text-muted-foreground max-w-md text-center mb-4">
-                        La IA está analizando tu marca, estrategia y audiencia para generar contenido personalizado.
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 px-4 py-2 rounded-full">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Esto puede tomar entre 30 y 90 segundos...
+                        {/* Progress bar */}
+                        <div className="w-full bg-secondary rounded-full h-3 mb-3 overflow-hidden">
+                            <div
+                                className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${genProgress}%` }}
+                            />
+                        </div>
+
+                        <div className="flex justify-between text-sm text-muted-foreground mb-4">
+                            <span>{genStatus}</span>
+                            <span className="font-medium">{genProgress}%</span>
+                        </div>
+
+                        {genPieceCount.total > 0 && (
+                            <div className="text-center text-sm text-muted-foreground">
+                                {genPieceCount.done} de {genPieceCount.total} piezas generadas
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
