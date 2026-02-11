@@ -21,6 +21,7 @@ export const generateMonthContent = inngest.createFunction(
 
         // Step 1: Fetch data (< 2s)
         const monthData = await step.run("fetch-data", async () => {
+            console.log(`[Inngest] Step 1: Fetching data for month ${monthId}`);
             const contentMonth = await prisma.contentMonth.findUnique({
                 where: { id: monthId },
                 include: {
@@ -32,7 +33,8 @@ export const generateMonthContent = inngest.createFunction(
             if (!contentMonth) throw new Error(`ContentMonth ${monthId} not found`);
 
             // Delete old pieces
-            await prisma.contentPiece.deleteMany({ where: { contentMonthId: monthId } });
+            const deleted = await prisma.contentPiece.deleteMany({ where: { contentMonthId: monthId } });
+            console.log(`[Inngest] Deleted ${deleted.count} old pieces`);
 
             return JSON.parse(JSON.stringify(contentMonth)); // serialize for step
         });
@@ -79,8 +81,9 @@ export const generateMonthContent = inngest.createFunction(
 
         // Step 2: Generate strategy with AI (~5s)
         const strategy = await step.run("generate-strategy", async () => {
-            console.log(`[Inngest] Generating strategy for ${monthId}...`);
+            console.log(`[Inngest] Step 2: Generating strategy for ${monthId}...`);
             const strat = await generateStrategy(brandContext, monthBrief, plan, client.workspaceId);
+            console.log(`[Inngest] Strategy generated. Assignments: ${strat.pieceAssignments?.length || 0}`);
 
             // Save strategy to DB
             await prisma.contentMonth.update({
@@ -93,62 +96,69 @@ export const generateMonthContent = inngest.createFunction(
 
         // Build piece assignments from strategy
         const assignments = strategy.pieceAssignments || [];
-        const totalPieces = assignments.length || (plan.posts + plan.carousels + plan.reels + plan.stories);
+        console.log(`[Inngest] Total assignments to generate: ${assignments.length}`);
+
+        if (assignments.length === 0) {
+            console.error(`[Inngest] WARNING: Strategy returned 0 assignments!`);
+        }
 
         // Step 3-N: Generate each piece individually (~5s each)
-        let successCount = 0;
-
+        // NOTE: Each step.run() is a SEPARATE HTTP request.
+        // Local variables like successCount DO NOT persist between steps.
+        // That's why we count from the DB at the end.
         for (let i = 0; i < assignments.length; i++) {
             const assignment = assignments[i];
 
             await step.run(`generate-piece-${i}`, async () => {
-                console.log(`[Inngest] Generating piece ${i + 1}/${assignments.length}...`);
+                console.log(`[Inngest] Generating piece ${i + 1}/${assignments.length} - ${assignment.format} (${assignment.pillar}) day ${assignment.dayOfMonth}`);
 
-                try {
-                    const piece = await generateSinglePiece({
-                        brand: brandContext,
-                        brief: monthBrief,
-                        format: assignment.format,
-                        pillar: assignment.pillar,
-                        dayOfMonth: assignment.dayOfMonth,
-                        pieceNumber: i + 1,
-                        totalPieces: assignments.length,
-                    }, client.workspaceId);
+                const piece = await generateSinglePiece({
+                    brand: brandContext,
+                    brief: monthBrief,
+                    format: assignment.format,
+                    pillar: assignment.pillar,
+                    dayOfMonth: assignment.dayOfMonth,
+                    pieceNumber: i + 1,
+                    totalPieces: assignments.length,
+                }, client.workspaceId);
 
-                    // Save piece to DB immediately
-                    await prisma.contentPiece.create({
-                        data: {
-                            contentMonthId: monthId,
-                            type: piece.format,
-                            title: piece.topic,
-                            pillar: piece.pillar,
-                            copy: JSON.stringify({
-                                hooks: piece.hooks,
-                                captionLong: piece.captionLong,
-                                captionShort: piece.captionShort,
-                                ctas: piece.ctas,
-                            }),
-                            hashtags: piece.hashtags,
-                            visualBrief: piece.visualBrief,
-                            suggestedDate: new Date(monthData.year, monthData.month - 1, piece.dayOfMonth),
-                            status: "DRAFT",
-                            order: i,
-                            metadata: {
-                                carouselSlides: piece.carouselSlides || null,
-                            } as object,
-                        },
-                    });
+                console.log(`[Inngest] Piece ${i + 1} generated: "${piece.topic}"`);
 
-                    successCount++;
-                } catch (err) {
-                    console.error(`[Inngest] Failed to generate piece ${i + 1}:`, err);
-                    // Continue with next piece, don't fail the whole job
-                }
+                // Save piece to DB immediately
+                const saved = await prisma.contentPiece.create({
+                    data: {
+                        contentMonthId: monthId,
+                        type: piece.format,
+                        title: piece.topic,
+                        pillar: piece.pillar,
+                        copy: JSON.stringify({
+                            hooks: piece.hooks,
+                            captionLong: piece.captionLong,
+                            captionShort: piece.captionShort,
+                            ctas: piece.ctas,
+                        }),
+                        hashtags: piece.hashtags,
+                        visualBrief: piece.visualBrief,
+                        suggestedDate: new Date(monthData.year, monthData.month - 1, piece.dayOfMonth),
+                        status: "DRAFT",
+                        order: i,
+                        metadata: {
+                            carouselSlides: piece.carouselSlides || null,
+                        } as object,
+                    },
+                });
+
+                console.log(`[Inngest] Piece ${i + 1} SAVED to DB: ${saved.id}`);
+                return { pieceId: saved.id, title: piece.topic };
             });
         }
 
-        // Final step: Mark as completed
-        await step.run("finalize", async () => {
+        // Final step: Mark as completed, count from DB (not local variable!)
+        const result = await step.run("finalize", async () => {
+            const pieceCount = await prisma.contentPiece.count({
+                where: { contentMonthId: monthId },
+            });
+
             await prisma.contentMonth.update({
                 where: { id: monthId },
                 data: {
@@ -156,12 +166,14 @@ export const generateMonthContent = inngest.createFunction(
                     generatedAt: new Date(),
                 },
             });
-            console.log(`[Inngest] Completed! ${successCount}/${assignments.length} pieces generated.`);
+
+            console.log(`[Inngest] ✅ COMPLETED! ${pieceCount} pieces in DB for month ${monthId}`);
+            return { pieceCount };
         });
 
         return {
             success: true,
-            piecesGenerated: successCount,
+            piecesGenerated: result.pieceCount,
             totalRequested: assignments.length,
         };
     }
