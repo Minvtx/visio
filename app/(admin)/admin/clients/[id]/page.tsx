@@ -123,6 +123,7 @@ export default function ClientDetailPage() {
     const [genProgress, setGenProgress] = useState(0)
     const [genStatus, setGenStatus] = useState('')
     const [genPieceCount, setGenPieceCount] = useState({ done: 0, total: 0 })
+    const [deletingId, setDeletingId] = useState<string | null>(null)
 
     useEffect(() => {
         fetchClient()
@@ -245,6 +246,7 @@ export default function ClientDetailPage() {
 
         if (!confirm('¿Seguro que quieres ELIMINAR este mes? Se borrará todo el contenido, estrategia y feedback permanentemente.')) return
 
+        setDeletingId(monthId)
         try {
             const res = await fetch(`/api/months/${monthId}`, {
                 method: 'DELETE',
@@ -259,6 +261,8 @@ export default function ClientDetailPage() {
         } catch (err: any) {
             console.error('Error deleting month:', err)
             alert(err.message || 'Error al eliminar el mes')
+        } finally {
+            setDeletingId(null)
         }
     }
 
@@ -622,11 +626,19 @@ export default function ClientDetailPage() {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                                            disabled={deletingId === month.id}
+                                                            className={`h-8 w-8 ${month.status === 'GENERATING'
+                                                                ? "text-red-600 bg-red-100 hover:bg-red-200 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40"
+                                                                : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                                                }`}
                                                             onClick={(e) => handleDeleteMonth(month.id, e)}
-                                                            title="Eliminar mes"
+                                                            title={month.status === 'GENERATING' ? "Eliminar para reiniciar" : "Eliminar mes"}
                                                         >
-                                                            <X className="w-4 h-4" />
+                                                            {deletingId === month.id ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : (
+                                                                <X className="w-4 h-4" />
+                                                            )}
                                                         </Button>
                                                     </div>
 
