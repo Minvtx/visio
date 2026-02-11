@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateStrategy, generateSinglePiece } from '@/lib/agents/piece-generator'
+import { getWorkspaceApiKeys } from '@/lib/workspace'
 
 /**
  * GET /api/months/[id]/debug-generate
@@ -83,11 +84,15 @@ export async function GET(
 
         // 4. Check API Key
         const envKey = process.env.ANTHROPIC_API_KEY
-        log(`ENV ANTHROPIC_API_KEY present: ${!!envKey}, length: ${envKey?.length || 0}`)
+        const maskedEnv = envKey ? `${envKey.substring(0, 10)}...${envKey.substring(envKey.length - 4)}` : 'MISSING'
+        log(`Platform Key (.env): ${maskedEnv} (len: ${envKey?.length || 0})`)
 
-        if (!envKey) {
-            log('WARNING: Global ANTHROPIC_API_KEY missing. If workspace keys are also missing, this will fail.')
-        }
+        log(`Checking workspace ${client.workspaceId} for custom keys...`)
+        const workspaceKeys = await getWorkspaceApiKeys(client.workspaceId)
+        const maskedWs = workspaceKeys?.anthropic
+            ? `${workspaceKeys.anthropic.substring(0, 10)}...${workspaceKeys.anthropic.substring(workspaceKeys.anthropic.length - 4)}`
+            : 'NONE'
+        log(`Workspace Key (DB): ${maskedWs}`)
 
         // 5. Test Strategy Generation
         log('--- Testing Strategy Generation ---')
@@ -95,20 +100,12 @@ export async function GET(
 
         let strategy: any
         try {
-            log('Calling generateStrategy...')
+            log('Calling generateStrategy (Sonnet)...')
             strategy = await generateStrategy(brandContext as any, monthBrief as any, plan, client.workspaceId)
             log(`Strategy SUCCESS. Objective: ${strategy.monthlyObjective}`)
-
-            // Normalize assignments
-            const assignments = strategy.pieceAssignments
-                || strategy.piece_assignments
-                || strategy.assignments
-                || strategy.pieces
-                || []
-            log(`Assignments found: ${assignments.length}`)
         } catch (e: any) {
             log(`Strategy FAILED: ${e.message}`)
-            log(`Error stack: ${e.stack}`)
+            log(`Full Error: ${JSON.stringify(e)}`)
             return NextResponse.json({ success: false, error: `Strategy failed: ${e.message}`, logs })
         }
 
@@ -116,7 +113,7 @@ export async function GET(
         log('--- Testing Single Piece Generation ---')
         let piece: any
         try {
-            log('Calling generateSinglePiece (POST)...')
+            log('Calling generateSinglePiece with Haiku (speed/timeout test)...')
             piece = await generateSinglePiece({
                 brand: brandContext as any,
                 brief: monthBrief,
@@ -125,11 +122,12 @@ export async function GET(
                 dayOfMonth: 1,
                 pieceNumber: 1,
                 totalPieces: 1,
+                model: 'claude-3-haiku-20240307' // Force haiku for diagnostic
             }, client.workspaceId)
             log(`Piece generated SUCCESS: ${piece.topic}`)
         } catch (e: any) {
             log(`Piece generation FAILED: ${e.message}`)
-            log(`Error details: ${e.toString()}`)
+            log(`Full Error: ${JSON.stringify(e)}`)
             return NextResponse.json({ success: false, error: `Piece generation failed: ${e.message}`, logs })
         }
 

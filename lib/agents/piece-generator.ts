@@ -18,6 +18,7 @@ interface PieceRequest {
     dayOfMonth: number
     pieceNumber: number
     totalPieces: number
+    model?: string
 }
 
 /**
