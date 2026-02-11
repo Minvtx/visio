@@ -672,8 +672,17 @@ export default function ContentMonthPage() {
 
             {generating && !currentJobId && (
                 <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-                    <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
-                    <h2 className="text-xl font-bold">Iniciando Content Wizard...</h2>
+                    <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 animate-pulse">
+                        <Sparkles className="w-10 h-10 text-primary animate-spin" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Content Wizard trabajando...</h2>
+                    <p className="text-muted-foreground max-w-md text-center mb-4">
+                        La IA está analizando tu marca, estrategia y audiencia para generar contenido personalizado.
+                    </p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 px-4 py-2 rounded-full">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Esto puede tomar entre 30 y 90 segundos...
+                    </div>
                 </div>
             )}
         </div>
