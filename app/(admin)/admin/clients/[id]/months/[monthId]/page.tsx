@@ -296,6 +296,7 @@ export default function ContentMonthPage() {
     }
 
     // ─── REGENERATE (streaming with Vercel Pro) ───
+    // ─── REGENERATE (Robust Polling for Vercel Pro) ───
     const handleRegenerate = async (e?: React.MouseEvent) => {
         if (e) e.preventDefault()
         if (generating) return
@@ -308,102 +309,84 @@ export default function ContentMonthPage() {
         setGenPieceCount({ done: 0, total: 0 })
 
         try {
-            const response = await fetch(`/api/months/${monthId}/generate-stream`, {
+            // 1. Reset
+            setGenStatus('🧹 Limpiando contenido anterior...')
+            const resetRes = await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
+            if (!resetRes.ok) throw new Error('Falló el reset inicial')
+            setGenProgress(2)
+
+            // 2. Strategy
+            setGenStatus('🎯 Generando estrategia (esto puede tomar 30s)...')
+            const stratRes = await fetch(`/api/months/${monthId}/generate-step`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 'strategy' })
             })
 
-            if (!response.ok) {
-                // Si falla el inicio del stream
-                let msg = `Error del servidor (${response.status})`
+            if (!stratRes.ok) {
+                const txt = await stratRes.text()
                 try {
-                    const errData = await response.json()
-                    msg = errData.error || msg
-                } catch (e) { }
-
-                if (response.status === 504) msg = "Timeout de Vercel (10s). Posiblemente el plan Pro no se aplicó al deploy o no se hizo el deploy de Producción."
-                throw new Error(msg)
-            }
-
-            const reader = response.body?.getReader()
-            if (!reader) throw new Error('No se pudo iniciar el stream')
-
-            const decoder = new TextDecoder()
-            let buffer = ''
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                buffer += decoder.decode(value, { stream: true })
-
-                // Process complete SSE events
-                const lines = buffer.split('\n\n')
-                buffer = lines.pop() || '' // Keep incomplete event in buffer
-
-                for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue
-                    const jsonStr = line.replace('data: ', '')
-
-                    try {
-                        const event = JSON.parse(jsonStr)
-
-                        switch (event.type) {
-                            case 'status':
-                                setGenStatus(event.message)
-                                if (event.progress !== undefined) setGenProgress(event.progress)
-                                if (event.pieceNumber && event.totalPieces) {
-                                    setGenPieceCount({ done: event.pieceNumber, total: event.totalPieces })
-                                }
-                                break
-
-                            case 'strategy':
-                                setGenPieceCount({ done: 0, total: event.totalPieces })
-                                setGenProgress(event.progress || 5)
-                                setGenStatus(`🎯 Estrategia lista. Generando ${event.totalPieces} piezas...`)
-                                break
-
-                            case 'piece':
-                                setGenPieceCount({ done: event.pieceNumber, total: event.totalPieces })
-                                setGenProgress(event.progress || 50)
-                                setGenStatus(`✅ Pieza ${event.pieceNumber}/${event.totalPieces}: ${event.data?.title || ''}`)
-                                break
-
-                            case 'piece_error':
-                                setGenStatus(`⚠️ ${event.message}`)
-                                break
-
-                            case 'complete':
-                                setGenProgress(100)
-                                setGenStatus(event.message)
-                                await fetchMonth()
-                                break
-
-                            case 'error':
-                                throw new Error(event.message)
-                        }
-                    } catch (parseErr: any) {
-                        if (parseErr.message && !parseErr.message.includes('JSON')) {
-                            throw parseErr // Real error from the server
-                        }
-                        console.warn('SSE parse warning:', parseErr)
-                    }
+                    const json = JSON.parse(txt)
+                    throw new Error(json.error || `Error estrategia: ${stratRes.status}`)
+                } catch (e) {
+                    throw new Error(`Error estrategia: ${stratRes.status} - ${txt.substring(0, 50)}`)
                 }
             }
 
-            // Final refresh
+            const stratData = await stratRes.json()
+            const assignments = stratData.assignments || []
+            const total = assignments.length
+
+            if (total === 0) throw new Error('La IA no devolvió piezas para generar.')
+
+            setGenPieceCount({ done: 0, total })
+            setGenProgress(5)
+
+            // 3. Pieces Loop
+            let failCount = 0
+            for (let i = 0; i < assignments.length; i++) {
+                const assignment = assignments[i]
+                setGenStatus(`✍️ Pieza ${i + 1}/${total}: ${assignment.format}`)
+
+                try {
+                    const pieceRes = await fetch(`/api/months/${monthId}/generate-step`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            step: 'piece',
+                            assignment,
+                            pieceNumber: i + 1,
+                            totalPieces: total
+                        })
+                    })
+
+                    if (!pieceRes.ok) throw new Error(`Status ${pieceRes.status}`)
+
+                } catch (err) {
+                    console.error(`Fallo pieza ${i + 1}`, err)
+                    failCount++
+                    // No cortamos el loop, seguimos con la siguiente
+                }
+
+                setGenPieceCount({ done: i + 1, total })
+                setGenProgress(5 + Math.round(((i + 1) / total) * 90))
+            }
+
+            // 4. Finalize
+            setGenStatus('✅ Finalizando...')
+            await fetch(`/api/months/${monthId}/generate-step`, {
+                method: 'POST',
+                body: JSON.stringify({ step: 'finalize' })
+            })
+
+            setGenProgress(100)
+            setGenStatus(failCount > 0 ? `Terminado con ${failCount} errores` : '¡Éxito total!')
             await fetchMonth()
 
         } catch (err: any) {
-            console.error('Error en generación:', err)
-            setError(err.message || 'Error en la generación. Intentá de nuevo.')
-            // Reset the month status so it doesn't stay stuck
-            try {
-                await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
-                await fetchMonth()
-            } catch (resetErr) {
-                console.error('Error reseteando después de fallo:', resetErr)
-            }
+            console.error('Generación fallida:', err)
+            setError(`Error crítico: ${err.message}`)
+            // Try to unstick
+            fetch(`/api/months/${monthId}/reset`, { method: 'POST' }).catch(() => { })
         } finally {
             setTimeout(() => setGenerating(false), 2000)
         }
