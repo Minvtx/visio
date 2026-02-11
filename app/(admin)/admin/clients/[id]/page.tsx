@@ -398,7 +398,8 @@ export default function ClientDetailPage() {
                     </Link>
 
                     {/* Global Error Banner */}
-                    {error && !showGenerateModal && (
+                    {/* Global Error Banner */}
+                    {error && !showGenerateModal && !showStrategyModal && (
                         <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-lg flex items-center justify-between mb-4 animate-in fade-in slide-in-from-top-2">
                             <div className="flex items-center gap-2">
                                 <X className="w-5 h-5" />
@@ -915,10 +916,50 @@ export default function ClientDetailPage() {
                             {savingPlan && (
                                 <div className="mt-4 text-center">
                                     <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
-                                    Guardando plan...
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Full Screen Generation Overlay */}
+            {generating && !showGenerateModal && !showStrategyModal && (
+                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-md bg-card border border-border rounded-xl shadow-2xl p-8 text-center space-y-6 animate-in zoom-in-95 fade-in duration-300">
+                        <div className="relative w-20 h-20 mx-auto">
+                            <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+                            <div
+                                className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"
+                                style={{ animationDuration: '2s' }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center font-bold text-xl">
+                                {genProgress}%
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-xl font-bold mb-2">Generando Contenido</h3>
+                            <p className="text-muted-foreground animate-pulse">
+                                {genStatus || 'Iniciando...'}
+                            </p>
+                            {genPieceCount.total > 0 && (
+                                <p className="text-sm text-muted-foreground mt-2">
+                                    Pieza {genPieceCount.done} de {genPieceCount.total}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                            <div
+                                className="bg-primary h-full transition-all duration-500 ease-out"
+                                style={{ width: `${genProgress}%` }}
+                            />
+                        </div>
+
+                        <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                            Esto puede tomar unos momentos. Por favor no cierres la pestaña.
+                        </p>
                     </div>
                 </div>
             )}
