@@ -238,6 +238,30 @@ export default function ClientDetailPage() {
         }
     }
 
+    const handleDeleteMonth = async (monthId: string, e: React.MouseEvent) => {
+        setError('')
+        e.preventDefault() // Prevent navigation
+        e.stopPropagation() // Prevent event bubbling just in case
+
+        if (!confirm('¿Seguro que quieres ELIMINAR este mes? Se borrará todo el contenido, estrategia y feedback permanentemente.')) return
+
+        try {
+            const res = await fetch(`/api/months/${monthId}`, {
+                method: 'DELETE',
+            })
+
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.error || 'Error al eliminar')
+            }
+
+            await fetchClient()
+        } catch (err: any) {
+            console.error('Error deleting month:', err)
+            alert(err.message || 'Error al eliminar el mes')
+        }
+    }
+
     const handleStrategyComplete = async () => {
         if (!createdMonthId) return
         setGenerating(true)
@@ -372,6 +396,19 @@ export default function ClientDetailPage() {
                         <ArrowLeft className="w-4 h-4" />
                         Volver a Clientes
                     </Link>
+
+                    {/* Global Error Banner */}
+                    {error && !showGenerateModal && (
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-lg flex items-center justify-between mb-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-center gap-2">
+                                <X className="w-5 h-5" />
+                                <span className="font-medium">{error}</span>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => setError('')} className="hover:bg-red-500/10 text-red-500">
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    )}
 
                     {/* Client Header */}
                     <div className="flex items-start justify-between">
@@ -567,6 +604,15 @@ export default function ClientDetailPage() {
                                                                 <Download className="w-4 h-4" />
                                                             </Button>
                                                         )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                                            onClick={(e) => handleDeleteMonth(month.id, e)}
+                                                            title="Eliminar mes"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </Button>
                                                         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                                     </div>
                                                 </CardContent>

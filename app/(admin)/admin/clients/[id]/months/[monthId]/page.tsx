@@ -311,6 +311,7 @@ export default function ContentMonthPage() {
         } catch (err: any) {
             console.error(err)
             setError(err.message || 'Error en la generación')
+            await fetchMonth()
         } finally {
             setTimeout(() => setGenerating(false), 1500) // Show 100% briefly
         }
@@ -388,7 +389,21 @@ export default function ContentMonthPage() {
     }
 
     if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
-    if (error || !monthData) return <div className="text-center py-20 text-red-500">{error || 'Mes no encontrado'}</div>
+
+    // Only block UI if we REALLY have no data (initial load fail)
+    if (!monthData) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="text-red-500 text-lg">{error || 'Mes no encontrado'}</div>
+                <Link href={`/admin/clients/${clientId}`}>
+                    <Button variant="outline">
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Volver al Cliente
+                    </Button>
+                </Link>
+            </div>
+        )
+    }
 
     const strategy = monthData.strategy || {}
     const tiers = strategy.contentPillars || []
@@ -435,6 +450,19 @@ export default function ContentMonthPage() {
                 <ArrowLeft className="w-4 h-4" />
                 Volver a {monthData.client?.name || 'Cliente'}
             </Link>
+
+            {/* Error Banner */}
+            {error && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2">
+                        <X className="w-5 h-5" />
+                        <span className="font-medium">{error}</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setError('')} className="hover:bg-red-500/10 text-red-500">
+                        <X className="w-4 h-4" />
+                    </Button>
+                </div>
+            )}
 
             {/* Header */}
             <div className="flex items-start justify-between">
