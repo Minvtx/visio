@@ -131,7 +131,7 @@ function PieceCard({ piece }: { piece: any }) {
     )
 }
 
-// --- Main Page ---
+// --- Main Page (Force Redeploy - Production Check) ---
 
 export default function ContentMonthPage() {
     const params = useParams()
