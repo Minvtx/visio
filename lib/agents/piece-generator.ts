@@ -26,12 +26,25 @@ export async function generateSinglePiece(
 ): Promise<GeneratedPiece> {
     let apiKey = process.env.ANTHROPIC_API_KEY
 
+    // Log key presence for debugging
+    console.log('[DEBUG] Generating piece. Env Key present:', !!apiKey)
+
     if (workspaceId) {
-        const keys = await getWorkspaceApiKeys(workspaceId)
-        if (keys.anthropic) apiKey = keys.anthropic
+        try {
+            const keys = await getWorkspaceApiKeys(workspaceId)
+            if (keys?.anthropic) {
+                apiKey = keys.anthropic
+                console.log('[DEBUG] Using workspace specific key')
+            }
+        } catch (e) {
+            console.error('[ERROR] Failed to fetch workspace keys:', e)
+        }
     }
 
-    if (!apiKey) throw new Error('No hay API Key de Anthropic configurada.')
+    if (!apiKey) {
+        console.error('[CRITICAL] No API Key found for Anthropic')
+        throw new Error('No hay API Key de Anthropic configurada. Verificá las variables de entorno.')
+    }
 
     const client = new Anthropic({ apiKey })
 
@@ -112,12 +125,25 @@ export async function generateStrategy(
 ) {
     let apiKey = process.env.ANTHROPIC_API_KEY
 
+    // Log key presence for debugging
+    console.log('[DEBUG] Generating strategy. Env Key present:', !!apiKey)
+
     if (workspaceId) {
-        const keys = await getWorkspaceApiKeys(workspaceId)
-        if (keys.anthropic) apiKey = keys.anthropic
+        try {
+            const keys = await getWorkspaceApiKeys(workspaceId)
+            if (keys?.anthropic) {
+                apiKey = keys.anthropic
+                console.log('[DEBUG] Using workspace specific key for strategy')
+            }
+        } catch (e) {
+            console.error('[ERROR] Failed to fetch workspace keys for strategy:', e)
+        }
     }
 
-    if (!apiKey) throw new Error('No hay API Key de Anthropic configurada.')
+    if (!apiKey) {
+        console.error('[CRITICAL] No API Key found for Anthropic (Strategy)')
+        throw new Error('No hay API Key de Anthropic configurada. Verificá las variables de entorno.')
+    }
 
     const client = new Anthropic({ apiKey })
     const monthName = MONTH_NAMES[brief.month - 1]

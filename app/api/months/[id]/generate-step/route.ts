@@ -156,9 +156,9 @@ export async function POST(
         return NextResponse.json({ error: 'Step inválido' }, { status: 400 })
 
     } catch (error: any) {
-        console.error('Error in generate-step:', error)
+        console.error('CRITICAL ERROR in generate-step:', error)
         return NextResponse.json(
-            { error: error.message || 'Error en generación' },
+            { error: error.message || 'Error crítico en el servidor' },
             { status: 500 }
         )
     }
