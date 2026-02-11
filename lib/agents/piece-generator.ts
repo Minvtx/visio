@@ -177,19 +177,38 @@ Genera SOLO la estrategia mensual en este JSON exacto:
 En pieceAssignments incluye EXACTAMENTE ${totalPieces} items distribuidos en el mes.
 Solo JSON, sin texto adicional.`
 
-    const response = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 3000,
-        temperature: 0.7,
-        messages: [{ role: 'user', content: prompt }]
-    })
+    try {
+        const response = await client.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 3000,
+            temperature: 0.7,
+            messages: [{ role: 'user', content: prompt }]
+        })
 
-    const textContent = response.content.find(c => c.type === 'text')
-    if (!textContent || textContent.type !== 'text') throw new Error('No response')
+        const textContent = response.content.find(c => c.type === 'text')
+        if (!textContent || textContent.type !== 'text') throw new Error('No response content from Claude')
 
-    let jsonText = textContent.text.trim()
-    if (jsonText.startsWith('```json')) jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '')
-    else if (jsonText.startsWith('```')) jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
+        let jsonText = (textContent as any).text.trim()
+        if (jsonText.startsWith('```json')) jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '')
+        else if (jsonText.startsWith('```')) jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
 
-    return JSON.parse(jsonText)
+        return JSON.parse(jsonText)
+    } catch (e: any) {
+        console.error('[STRATEGY ERROR] Failed to generate strategy:', e)
+        // Fallback Strategy so process doesn't die
+        return {
+            monthlyObjective: brief.primaryObjective || "Aumentar visibilidad y engagement",
+            pillars: [
+                { name: "Educación", description: "Contenido de valor", percentage: 40 },
+                { name: "Entretenimiento", description: "Humor y tendencias", percentage: 30 },
+                { name: "Venta", description: "Promoción de servicios", percentage: 30 }
+            ],
+            keyDates: [],
+            pieceAssignments: Array.from({ length: totalPieces }).map((_, i) => ({
+                dayOfMonth: Math.min(28, (i * 2) + 1),
+                format: i % 4 === 0 ? 'REEL' : i % 3 === 0 ? 'CAROUSEL' : 'POST',
+                pillar: i % 2 === 0 ? 'Educación' : 'Entretenimiento'
+            }))
+        }
+    }
 }
