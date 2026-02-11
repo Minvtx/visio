@@ -184,13 +184,15 @@ export default function ContentMonthPage() {
 
     const fetchMonth = async () => {
         try {
-            const res = await fetch(`/api/months/${monthId}`)
+            const res = await fetch(`/api/months/${monthId}?t=${Date.now()}`)
             if (!res.ok) throw new Error('Error al cargar mes')
             const data = await res.json()
             setMonthData(data)
+            return data
         } catch (err) {
             console.error(err)
             setError('No se pudo cargar la información del mes')
+            return null
         } finally {
             setLoading(false)
         }
@@ -381,14 +383,20 @@ export default function ContentMonthPage() {
             })
 
             setGenProgress(100)
-            if (errors > 0) {
-                setGenStatus(`⚠️ Generación completada con ${errors} errores.`)
-            } else {
-                setGenStatus('✅ ¡Generación completada con éxito!')
-            }
 
-            // Refresh Data
-            await fetchMonth()
+            // Refresh Data with check
+            setGenStatus('🔄 verificando piezas...')
+            const newData = await fetchMonth()
+
+            if (newData && newData.pieces && newData.pieces.length > 0) {
+                if (errors > 0) {
+                    setGenStatus(`⚠️ Completado con ${newData.pieces.length} piezas (${errors} errores).`)
+                } else {
+                    setGenStatus(`✅ ¡Éxito! ${newData.pieces.length} piezas generadas correctamente.`)
+                }
+            } else {
+                setGenStatus(`⚠️ La generación terminó pero NO se ven piezas. (Errores: ${errors})`)
+            }
 
             // Auto-close if success (optional, or let user close with button)
             if (errors === 0) {
@@ -595,9 +603,18 @@ export default function ContentMonthPage() {
                         variant="outline"
                         size="sm"
                         className="text-xs border-blue-500/30 text-blue-600"
-                        onClick={() => fetch('/api/health').then(r => r.json()).then(d => alert('API Status: ' + JSON.stringify(d, null, 2))).catch(e => alert('API Error: ' + e.message))}
+                        onClick={() => {
+                            alert('Ejecutando diagnóstico completo... Esto puede tardar 30s. Esperá el resultado.')
+                            fetch(`/api/months/${monthId}/debug-generate`)
+                                .then(r => r.json())
+                                .then(d => {
+                                    const logsText = (d.logs || []).join('\n')
+                                    alert(`Resultado: ${d.success ? '✅ OK' : '❌ FALLO'}\n\nError: ${d.error || 'ninguno'}\nPiezas en DB: ${d.piecesInDb || '?'}\n\nLogs:\n${logsText}`)
+                                })
+                                .catch(e => alert('Error de conexión: ' + e.message))
+                        }}
                     >
-                        🩺 Test API
+                        🔬 Diagnosticar
                     </Button>
                     <Button
                         variant="outline"
