@@ -581,6 +581,14 @@ export default function ContentMonthPage() {
                 <div className="flex gap-2 flex-wrap relative">
                     <Button
                         variant="outline"
+                        size="sm"
+                        className="text-xs border-blue-500/30 text-blue-600"
+                        onClick={() => fetch('/api/health').then(r => r.json()).then(d => alert('API Status: ' + JSON.stringify(d, null, 2))).catch(e => alert('API Error: ' + e.message))}
+                    >
+                        🩺 Test API
+                    </Button>
+                    <Button
+                        variant="outline"
                         onClick={handleSyncCalendar}
                         disabled={syncingCalendar}
                         className="border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-600 hover:text-emerald-700"
