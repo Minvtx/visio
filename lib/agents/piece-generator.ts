@@ -94,26 +94,47 @@ ${req.brand.guardrails?.length ? 'REGLAS: ' + req.brand.guardrails.join('. ') : 
 
 Solo JSON, sin texto adicional.`
 
-    const response = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 2000,
-        temperature: 0.8,
-        messages: [{ role: 'user', content: prompt }]
-    })
+    try {
+        const response = await client.messages.create({
+            model: 'claude-3-5-sonnet-latest',
+            max_tokens: 3000,
+            temperature: 0.7,
+            messages: [{ role: 'user', content: prompt }]
+        })
 
-    const textContent = response.content.find(c => c.type === 'text')
-    if (!textContent || textContent.type !== 'text') {
-        throw new Error('No text response from Claude')
+        const textContent = response.content.find(c => c.type === 'text')
+        if (!textContent || textContent.type !== 'text') {
+            throw new Error('No text response from Claude')
+        }
+
+        let jsonText = (textContent as any).text.trim()
+
+        // Log raw for debug
+        // console.log('[DEBUG] Raw AI Response:', jsonText.substring(0, 100) + '...')
+
+        // Cleanup markdown
+        if (jsonText.startsWith('```json')) {
+            jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '')
+        } else if (jsonText.startsWith('```')) {
+            jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
+        }
+
+        try {
+            return JSON.parse(jsonText.trim()) as GeneratedPiece
+        } catch (parseError) {
+            console.error('[JSON PARSE ERROR] Raw text:', jsonText)
+            throw new Error('La IA no devolvió un JSON válido. Revisa los logs.')
+        }
+
+    } catch (e: any) {
+        if (e.status === 401) throw new Error('API Key de Anthropic inválida o expirada.')
+        if (e.status === 404) throw new Error('Modelo de IA no disponible para esta API Key.')
+        if (e.status === 429) throw new Error('Límite de cuota de Anthropic excedido.')
+        if (e.status === 529) throw new Error('Anthropic está sobrecargado. Intenta en unos minutos.')
+
+        console.error('[ANTHROPIC ERROR]', e)
+        throw e
     }
-
-    let jsonText = textContent.text.trim()
-    if (jsonText.startsWith('```json')) {
-        jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '')
-    } else if (jsonText.startsWith('```')) {
-        jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
-    }
-
-    return JSON.parse(jsonText) as GeneratedPiece
 }
 
 // Generate just the strategy (lightweight, < 5 seconds)
@@ -179,7 +200,7 @@ Solo JSON, sin texto adicional.`
 
     try {
         const response = await client.messages.create({
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-3-5-sonnet-latest',
             max_tokens: 3000,
             temperature: 0.7,
             messages: [{ role: 'user', content: prompt }]
