@@ -9,5 +9,5 @@ export const dynamic = 'force-dynamic';
 export const { GET, POST, PUT } = serve({
     client: inngest,
     functions: [generateMonthContent],
-    signingKey: process.env.INNGEST_SIGNING_KEY,
+    signingKey: process.env.INNGEST_SIGNING_KEY_MANUAL || process.env.INNGEST_SIGNING_KEY,
 });
