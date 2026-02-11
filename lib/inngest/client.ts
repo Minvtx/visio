@@ -1,6 +1,6 @@
 import { Inngest } from "inngest";
 
-// Volvemos al ID original que tenés en el Dashboard
+// Mantenemos el ID original para que coincida con las llaves de Vercel
 export const inngest = new Inngest({
     id: "visio",
     name: "Visio Content Studio"
