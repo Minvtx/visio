@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const maxDuration = 60;
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -63,7 +64,8 @@ export async function POST(
             },
             params.id,
             'ContentMonth',
-            session.user.id
+            session.user.id,
+            true // waitForCompletion: true for Vercel
         );
 
         // Update status to GENERATING immediately so UI reflects it

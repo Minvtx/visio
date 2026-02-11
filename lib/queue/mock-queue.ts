@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { Job, JobStatus } from "@prisma/client";
 import { generateMonthProcessor } from "./processors/month-generator";
 
@@ -47,11 +47,15 @@ export async function createJob(
 
     console.log(`[MockQueue] Job created: ${job.id} (${type}) - Starting execution...`);
 
-    // 2. Trigger "Async" execution (fire and forget promise)
-    // We use setImmediate to ensure it runs in the next tick, not blocking response slightly
-    setTimeout(() => processJob(job.id), 100);
-
-    return job;
+    // 2. Trigger execution
+    if (waitForCompletion) {
+        await processJob(job.id);
+        return await prisma.job.findUnique({ where: { id: job.id } }) || job;
+    } else {
+        // Fire and forget for local dev or long tasks with real workers
+        setTimeout(() => processJob(job.id), 100);
+        return job;
+    }
 }
 
 /**
