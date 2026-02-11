@@ -23,7 +23,9 @@ import {
     FileJson,
     ChevronDown,
     LayoutGrid,
-    X
+    X,
+    AlertTriangle,
+    Trash2
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -111,18 +113,20 @@ function DroppableDay({ day, children, disabled }: { day: number | null, childre
 }
 
 function PieceCard({ piece }: { piece: any }) {
-    // Determine visual style - exact copy of the Link content below
     return (
         <div
             className={`block p-1.5 rounded-md text-[10px] sm:text-xs border-l-2 bg-secondary/40 shadow-sm ${statusColors[piece.status] || 'border-l-gray-400'}`}
         >
             <div className="flex items-center gap-1 mb-0.5">
                 <span>{formatEmojis[piece.type || piece.format]}</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${getPillarColor(piece.pillar)}`} />
+                <span className="font-medium truncate">{piece.title || 'Sin título'}</span>
             </div>
-            <div className="font-medium truncate leading-tight">
-                {piece.title}
-            </div>
+            {piece.pillar && (
+                <div className="flex items-center gap-1">
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${getPillarColor(piece.pillar)}`} />
+                    <span className="text-muted-foreground truncate">{piece.pillar}</span>
+                </div>
+            )}
         </div>
     )
 }
@@ -146,6 +150,8 @@ export default function ContentMonthPage() {
     const [genProgress, setGenProgress] = useState(0)
     const [genStatus, setGenStatus] = useState('')
     const [genPieceCount, setGenPieceCount] = useState({ done: 0, total: 0 })
+    const [deleting, setDeleting] = useState(false)
+    const [resetting, setResetting] = useState(false)
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
@@ -170,6 +176,7 @@ export default function ContentMonthPage() {
         fetchMonth()
     }, [monthId])
 
+    // ─── SYNC CALENDAR ───
     const handleSyncCalendar = async () => {
         setSyncingCalendar(true)
         try {
@@ -187,6 +194,7 @@ export default function ContentMonthPage() {
         }
     }
 
+    // ─── EXPORT ───
     const handleExport = async (format: 'json' | 'csv' | 'txt') => {
         setExporting(format)
         setShowExportMenu(false)
@@ -219,28 +227,55 @@ export default function ContentMonthPage() {
         }
     }
 
+    // ─── RESET MONTH (unstick from GENERATING) ───
     const handleResetMonth = async () => {
-        if (!confirm('¿Seguro que quieres resetear el estado de este mes? Esto desbloqueará el botón de generación si se quedó trabado.')) return
-        setLoading(true)
+        if (!confirm('¿Resetear este mes a borrador? Se eliminarán las piezas generadas parcialmente.')) return
+        setResetting(true)
+        setError('')
         try {
             const res = await fetch(`/api/months/${monthId}/reset`, {
                 method: 'POST',
             })
-            if (!res.ok) throw new Error('Error al resetear')
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error || 'Error al resetear')
+            }
             await fetchMonth()
-        } catch (err) {
+        } catch (err: any) {
             console.error(err)
-            setError('Error al resetear el mes')
+            setError(err.message || 'Error al resetear el mes')
         } finally {
-            setLoading(false)
+            setResetting(false)
         }
     }
 
+    // ─── DELETE MONTH ───
+    const handleDeleteMonth = async () => {
+        if (!confirm('¿Seguro que quieres ELIMINAR este mes? Se borrará todo el contenido, estrategia y feedback permanentemente.')) return
+        setDeleting(true)
+        setError('')
+        try {
+            const res = await fetch(`/api/months/${monthId}`, {
+                method: 'DELETE',
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error || 'Error al eliminar')
+            }
+            // Navigate back to client page
+            window.location.href = `/admin/clients/${clientId}`
+        } catch (err: any) {
+            console.error(err)
+            setError(err.message || 'No se pudo eliminar el mes')
+            setDeleting(false)
+        }
+    }
+
+    // ─── REGENERATE (the core generation flow) ───
     const handleRegenerate = async (e?: React.MouseEvent) => {
         if (e) e.preventDefault()
-
         if (generating) return
-        if (!confirm('¿Seguro que quieres borrar todo el contenido actual y generar este mes?')) return
+        if (!confirm('¿Seguro que quieres borrar todo el contenido actual y generar este mes desde cero?')) return
 
         setGenerating(true)
         setError('')
@@ -249,9 +284,14 @@ export default function ContentMonthPage() {
         setGenPieceCount({ done: 0, total: 0 })
 
         try {
-            // 1. Reset (clear old pieces)
-            setGenStatus('Limpiando contenido anterior...')
-            await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
+            // 1. Reset (clear old pieces and set status to DRAFT)
+            setGenStatus('🧹 Limpiando contenido anterior...')
+            const resetRes = await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
+            if (!resetRes.ok) {
+                const errData = await resetRes.json().catch(() => ({}))
+                throw new Error(errData.error || 'Error al resetear el mes')
+            }
+            setGenProgress(2)
 
             // 2. Generate strategy with Claude
             setGenStatus('🎯 Generando estrategia mensual con IA...')
@@ -262,81 +302,96 @@ export default function ContentMonthPage() {
             })
 
             if (!stratRes.ok) {
-                const errData = await stratRes.json()
-                throw new Error(errData.error || 'Error al generar estrategia')
+                const errData = await stratRes.json().catch(() => ({}))
+                throw new Error(errData.error || 'Error al generar estrategia. Verificá que la API key de Anthropic esté configurada.')
             }
 
             const stratData = await stratRes.json()
             const assignments = stratData.assignments || []
             const total = assignments.length
+
+            if (total === 0) {
+                throw new Error('La IA no generó piezas. Intentá de nuevo.')
+            }
+
             setGenPieceCount({ done: 0, total })
             setGenProgress(5) // Strategy = 5%
 
             // 3. Generate each piece one by one
+            let successCount = 0
+            let failCount = 0
+
             for (let i = 0; i < assignments.length; i++) {
                 const assignment = assignments[i]
-                setGenStatus(`✍️ Generando pieza ${i + 1}/${total}: ${assignment.format} - ${assignment.pillar}`)
+                setGenStatus(`✍️ Pieza ${i + 1}/${total}: ${assignment.format} - ${assignment.pillar}`)
 
-                const pieceRes = await fetch(`/api/months/${monthId}/generate-step`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        step: 'piece',
-                        assignment,
-                        pieceNumber: i + 1,
-                        totalPieces: total
+                try {
+                    const pieceRes = await fetch(`/api/months/${monthId}/generate-step`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            step: 'piece',
+                            assignment,
+                            pieceNumber: i + 1,
+                            totalPieces: total
+                        })
                     })
-                })
 
-                if (!pieceRes.ok) {
-                    console.error(`Failed piece ${i + 1}, skipping...`)
-                    continue // Skip failed pieces, don't break the loop
+                    if (!pieceRes.ok) {
+                        console.error(`Pieza ${i + 1} falló, continuando...`)
+                        failCount++
+                    } else {
+                        successCount++
+                    }
+                } catch (pieceErr) {
+                    console.error(`Pieza ${i + 1} error de red:`, pieceErr)
+                    failCount++
                 }
 
-                const pieceData = await pieceRes.json()
                 setGenPieceCount({ done: i + 1, total })
                 setGenProgress(5 + Math.round(((i + 1) / total) * 90)) // 5-95%
             }
 
             // 4. Finalize
             setGenStatus('✅ Finalizando...')
-            await fetch(`/api/months/${monthId}/generate-step`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ step: 'finalize' })
-            })
+            try {
+                await fetch(`/api/months/${monthId}/generate-step`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ step: 'finalize' })
+                })
+            } catch (finalizeErr) {
+                console.error('Error finalizando:', finalizeErr)
+                // Non-critical, pieces are already saved
+            }
 
             setGenProgress(100)
-            setGenStatus('🎉 ¡Contenido generado!')
+
+            if (failCount > 0) {
+                setGenStatus(`⚠️ Listo con ${failCount} errores. ${successCount} piezas generadas.`)
+            } else {
+                setGenStatus('🎉 ¡Contenido generado exitosamente!')
+            }
 
             // Refresh data
             await fetchMonth()
 
         } catch (err: any) {
-            console.error(err)
-            setError(err.message || 'Error en la generación')
-            await fetchMonth()
+            console.error('Error en generación:', err)
+            setError(err.message || 'Error en la generación. Intentá de nuevo.')
+            // Reset the month status so it doesn't stay stuck
+            try {
+                await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
+                await fetchMonth()
+            } catch (resetErr) {
+                console.error('Error reseteando después de fallo:', resetErr)
+            }
         } finally {
-            setTimeout(() => setGenerating(false), 1500) // Show 100% briefly
+            setTimeout(() => setGenerating(false), 2000) // Show final status briefly
         }
     }
 
-    const handleDeleteMonth = async () => {
-        if (!confirm('¿Seguro que quieres ELIMINAR este mes? Se borrará todo el contenido, estrategia y feedback permanentemente.')) return
-        setLoading(true)
-        try {
-            const res = await fetch(`/api/months/${monthId}`, {
-                method: 'DELETE',
-            })
-            if (!res.ok) throw new Error('Error al eliminar')
-            window.location.href = `/admin/clients/${clientId}`
-        } catch (err) {
-            console.error(err)
-            setError('No se pudo eliminar el mes')
-            setLoading(false)
-        }
-    }
-
+    // ─── DND HANDLERS ───
     const handleDragStart = (event: any) => {
         const piece = event.active.data.current
         setActivePiece(piece)
@@ -348,35 +403,24 @@ export default function ContentMonthPage() {
 
         if (over && active.id !== over.id) {
             const newDay = parseInt(over.id as string)
-            if (isNaN(newDay)) return // Dropped on non-day
+            if (isNaN(newDay)) return
 
             const pieceId = active.id
-
-            // Find current piece data
-            const pieces = [...(monthData.pieces || [])]
-            const pieceIndex = pieces.findIndex((p: any) => p.id === pieceId)
+            const pcs = [...(monthData.pieces || [])]
+            const pieceIndex = pcs.findIndex((p: any) => p.id === pieceId)
 
             if (pieceIndex === -1) return
 
-            const piece = pieces[pieceIndex]
+            const piece = pcs[pieceIndex]
             const oldDate = new Date(piece.suggestedDate)
 
-            // Should verify if day changed actually?
-            // over.id is newDay.
-            // Check if user dropped on same date
             if (oldDate.getDate() === newDay && oldDate.getMonth() === monthData.month - 1) return
 
-            // Calculate new date (preserve year/month, set day)
-            // Use local date construction to avoid timezone jumps if possible, or UTC?
-            // suggestedDate is ISO.
-            // Let's create date in same month/year.
-            const newDate = new Date(monthData.year, monthData.month - 1, newDay, 12, 0, 0) // Midday to be safe
-
-            // Optimistic Update
+            const newDate = new Date(monthData.year, monthData.month - 1, newDay, 12, 0, 0)
             const updatedPiece = { ...piece, suggestedDate: newDate.toISOString() }
-            pieces[pieceIndex] = updatedPiece
+            pcs[pieceIndex] = updatedPiece
 
-            setMonthData({ ...monthData, pieces })
+            setMonthData({ ...monthData, pieces: pcs })
 
             try {
                 const res = await fetch(`/api/pieces/${pieceId}`, {
@@ -392,9 +436,9 @@ export default function ContentMonthPage() {
         }
     }
 
+    // ─── LOADING / ERROR STATES ───
     if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
 
-    // Only block UI if we REALLY have no data (initial load fail)
     if (!monthData) {
         return (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -412,6 +456,7 @@ export default function ContentMonthPage() {
     const strategy = monthData.strategy || {}
     const tiers = strategy.contentPillars || []
     const pieces = monthData.pieces || []
+    const isStuck = monthData.status === 'GENERATING' && !generating
 
     const stats = {
         total: pieces.length,
@@ -459,12 +504,67 @@ export default function ContentMonthPage() {
             {error && (
                 <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-2">
-                        <X className="w-5 h-5" />
+                        <AlertTriangle className="w-5 h-5" />
                         <span className="font-medium">{error}</span>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => setError('')} className="hover:bg-red-500/10 text-red-500">
                         <X className="w-4 h-4" />
                     </Button>
+                </div>
+            )}
+
+            {/* ⚠️ STUCK MONTH BANNER - This is the KEY fix */}
+            {isStuck && (
+                <div className="bg-amber-500/10 border-2 border-amber-500/40 text-amber-700 dark:text-amber-400 p-6 rounded-xl animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-start gap-4">
+                        <AlertTriangle className="w-8 h-8 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <h3 className="text-lg font-bold mb-1">Este mes se quedó trabado en &quot;Generando&quot;</h3>
+                            <p className="text-sm opacity-80 mb-4">
+                                La generación anterior falló o se interrumpió. Tenés dos opciones:
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                                <Button
+                                    onClick={handleResetMonth}
+                                    disabled={resetting}
+                                    variant="outline"
+                                    className="border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                                >
+                                    {resetting ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                    )}
+                                    Resetear a Borrador
+                                </Button>
+                                <Button
+                                    onClick={handleRegenerate}
+                                    disabled={generating}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                                >
+                                    {generating ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="w-4 h-4 mr-2" />
+                                    )}
+                                    Regenerar Todo
+                                </Button>
+                                <Button
+                                    onClick={handleDeleteMonth}
+                                    disabled={deleting}
+                                    variant="outline"
+                                    className="border-red-500/50 text-red-600 hover:bg-red-500/10"
+                                >
+                                    {deleting ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                    )}
+                                    Eliminar Mes
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -477,7 +577,7 @@ export default function ContentMonthPage() {
                     </div>
                     <p className="text-muted-foreground mt-1">{monthData.client?.name}</p>
                 </div>
-                <div className="flex gap-2 relative">
+                <div className="flex gap-2 flex-wrap relative">
                     <Button
                         variant="outline"
                         onClick={handleSyncCalendar}
@@ -491,16 +591,29 @@ export default function ContentMonthPage() {
                         )}
                         Sincronizar Calendar
                     </Button>
-                    <Button variant="outline" onClick={handleRegenerate}>
-                        <RotateCcw className="w-4 h-4 mr-2" />
+                    <Button
+                        variant="outline"
+                        onClick={() => handleRegenerate()}
+                        disabled={generating}
+                    >
+                        {generating ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                        )}
                         Regenerar Todo
                     </Button>
                     <Button
                         variant="outline"
                         onClick={handleDeleteMonth}
+                        disabled={deleting}
                         className="border-red-500/30 text-red-600 hover:bg-red-500/5"
                     >
-                        <X className="w-4 h-4 mr-2" />
+                        {deleting ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <Trash2 className="w-4 h-4 mr-2" />
+                        )}
                         Eliminar Mes
                     </Button>
                     <div className="relative">
@@ -525,20 +638,6 @@ export default function ContentMonthPage() {
                             </div>
                         )}
                     </div>
-                    <Button onClick={() => { }}>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Mejorar con IA
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleResetMonth}
-                        className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                        title="Resetear estado si se quedó trabado en Generando"
-                    >
-                        <RotateCcw className="w-3 h-3 mr-1" />
-                        Reset Estado
-                    </Button>
                 </div>
             </div>
 
@@ -548,29 +647,36 @@ export default function ContentMonthPage() {
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-4">
-                                <div><span className="text-sm text-muted-foreground">Objetivo:</span><span className="ml-2 font-medium">{strategy.primaryObjective || 'No definido'}</span></div>
-                                <div className="h-4 w-px bg-border" />
-                                <div><span className="text-sm text-muted-foreground">KPI:</span><span className="ml-2 font-medium">{strategy.specificGoal || '-'}</span></div>
+                                {strategy?.monthlyObjective && (
+                                    <div className="text-sm">
+                                        <span className="text-muted-foreground">Objetivo: </span>
+                                        <span className="font-medium">{strategy.monthlyObjective}</span>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex items-center gap-6 text-sm">
-                                <span><strong className="text-foreground">{stats.total}</strong> piezas</span>
-                                <span className="text-emerald-500"><strong>{stats.approved}</strong> aprobadas</span>
-                                <span className="text-amber-500"><strong>{stats.pending}</strong> pendientes</span>
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                <span>{stats.total} piezas</span>
+                                {stats.approved > 0 && <span className="text-emerald-500">✓ {stats.approved}</span>}
+                                {stats.pending > 0 && <span className="text-amber-500">⏳ {stats.pending}</span>}
+                                {stats.draft > 0 && <span>📝 {stats.draft}</span>}
                             </div>
                         </div>
                         {pillarsDisplay.length > 0 && (
-                            <>
-                                <div className="flex h-2 rounded-full overflow-hidden bg-secondary">
-                                    {pillarsDisplay.map((pillar: any, i: number) => (
-                                        <div key={i} style={{ width: `${pillar.percentage}%` }} className={`${pillar.color} h-full`} title={pillar.name} />
-                                    ))}
-                                </div>
-                                <div className="flex gap-4 mt-2 text-xs flex-wrap">
-                                    {pillarsDisplay.map((pillar: any, i: number) => (
-                                        <span key={i} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${pillar.color}`} />{pillar.name}</span>
-                                    ))}
-                                </div>
-                            </>
+                            <div className="flex gap-1 h-2 rounded-full overflow-hidden">
+                                {pillarsDisplay.map((pillar: any) => (
+                                    <div key={pillar.name} className={`${pillar.color} transition-all`} style={{ width: `${pillar.percentage}%` }} title={pillar.name} />
+                                ))}
+                            </div>
+                        )}
+                        {pillarsDisplay.length > 0 && (
+                            <div className="flex gap-4 mt-2 flex-wrap">
+                                {pillarsDisplay.map((pillar: any) => (
+                                    <div key={pillar.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <span className={`inline-block w-2 h-2 rounded-full ${pillar.color}`} />
+                                        {pillar.name}
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </CardContent>
                 </Card>
@@ -578,11 +684,14 @@ export default function ContentMonthPage() {
 
             {/* View Toggle */}
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Calendar className="w-5 h-5" />
-                    Calendario de Contenido
-                </h2>
-                <div className="flex gap-1 p-1 bg-secondary rounded-lg">
+                <div className="flex items-center gap-4">
+                    {strategy.keyDates && strategy.keyDates.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                            📅 {strategy.keyDates.map((d: any) => `${d.date}: ${d.event}`).join(' | ')}
+                        </div>
+                    )}
+                </div>
+                <div className="flex bg-secondary/50 rounded-lg p-1 gap-1">
                     <button onClick={() => setView('calendar')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${view === 'calendar' ? 'bg-background font-medium' : 'text-muted-foreground'}`}>
                         <Calendar className="w-4 h-4" /> Calendario
                     </button>
@@ -611,12 +720,18 @@ export default function ContentMonthPage() {
                                 </div>
                                 <h3 className="text-xl font-bold mb-2">Este mes está vacío</h3>
                                 <p className="text-muted-foreground max-w-sm mb-6">
-                                    Haz clic en el botón para que la IA genere toda la estrategia y las piezas de contenido automáticamente.
+                                    Hacé clic en el botón para que la IA genere toda la estrategia y las piezas de contenido automáticamente.
                                 </p>
-                                <Button size="lg" onClick={handleRegenerate} className="shadow-lg shadow-primary/20">
-                                    <Sparkles className="w-4 h-4 mr-2" />
-                                    Generar Todo el Mes
-                                </Button>
+                                <div className="flex gap-3">
+                                    <Button size="lg" onClick={() => handleRegenerate()} className="shadow-lg shadow-primary/20">
+                                        <Sparkles className="w-4 h-4 mr-2" />
+                                        Generar Todo el Mes
+                                    </Button>
+                                    <Button size="lg" variant="outline" onClick={handleDeleteMonth} className="border-red-500/30 text-red-600 hover:bg-red-500/5">
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Eliminar Mes
+                                    </Button>
+                                </div>
                             </div>
                         )}
 
@@ -643,12 +758,7 @@ export default function ContentMonthPage() {
                                             <div className="space-y-1">
                                                 {cell.pieces.map((piece: any) => (
                                                     <DraggablePiece key={piece.id} piece={piece}>
-                                                        <Link
-                                                            href={`/admin/pieces/${piece.id}`}
-                                                        // We prevent default drag behavior of Link/Anchor by touch-none on parent, 
-                                                        // but on click we want navigation.
-                                                        // DnD Kit allows interaction if not dragging.
-                                                        >
+                                                        <Link href={`/admin/pieces/${piece.id}`}>
                                                             <PieceCard piece={piece} />
                                                         </Link>
                                                     </DraggablePiece>
@@ -712,6 +822,7 @@ export default function ContentMonthPage() {
                 </div>
             )}
 
+            {/* Generation Overlay */}
             {generating && (
                 <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
                     <div className="w-full max-w-md p-8">
@@ -738,6 +849,10 @@ export default function ContentMonthPage() {
                                 {genPieceCount.done} de {genPieceCount.total} piezas generadas
                             </div>
                         )}
+
+                        <p className="text-center text-xs text-muted-foreground mt-6">
+                            No cierres esta pestaña. Cada pieza se genera individualmente para evitar timeouts.
+                        </p>
                     </div>
                 </div>
             )}
