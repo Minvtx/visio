@@ -202,6 +202,30 @@ export default function ContentMonthPage() {
         fetchMonth()
     }, [monthId])
 
+    // ─── POLLING FOR BACKGROUND GENERATION ───
+    useEffect(() => {
+        let interval: NodeJS.Timeout | null = null;
+
+        if (monthData?.status === 'GENERATING') {
+            setGenerating(true);
+            setGenStatus('⏳ Generando en segundo plano... Las piezas aparecerán automáticamente.');
+
+            interval = setInterval(async () => {
+                const refreshed = await fetchMonth();
+                if (refreshed?.status !== 'GENERATING') {
+                    setGenerating(false);
+                    if (interval) clearInterval(interval);
+                }
+            }, 6000); // Poll every 6s
+        } else if (generating && monthData?.status !== 'GENERATING') {
+            setGenerating(false);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [monthData?.status]);
+
     // ─── SYNC CALENDAR ───
     const handleSyncCalendar = async () => {
         setSyncingCalendar(true)
@@ -297,116 +321,38 @@ export default function ContentMonthPage() {
         }
     }
 
-    // ─── REGENERATE (Streaming SSE - Best for Vercel Pro) ───
+    // ─── REGENERATE (Background Job via Inngest) ───
     const handleRegenerate = async (e?: React.MouseEvent) => {
         if (e) e.preventDefault()
         if (generating) return
 
-        if (!confirm('¿Estás seguro? Esto borrará las piezas actuales y generará nuevas.')) return
+        if (!confirm('¿Estás seguro? Esto borrará las piezas actuales y generará nuevas en segundo plano.')) return
 
         try {
             setGenerating(true)
             setGenProgress(0)
-            setGenStatus('🚀 Iniciando motor de IA...')
-            setGenPieceCount({ total: 0, done: 0 })
+            setGenStatus('🚀 Iniciando motor de IA en segundo plano...')
 
-            // 1. Generate Strategy (First Step)
-            setGenStatus('🧠 Analizando marca y estrategia...')
-            const strategyRes = await fetch(`/api/months/${monthId}/generate-step`, {
+            // 1. Trigger the background job
+            const res = await fetch(`/api/months/${monthId}/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ step: 'strategy' })
+                headers: { 'Content-Type': 'application/json' }
             })
 
-            if (!strategyRes.ok) {
-                const errorData = await strategyRes.json()
-                throw new Error(errorData.error || 'Error generando estrategia')
+            if (!res.ok) {
+                const errorData = await res.json()
+                throw new Error(errorData.error || 'Error iniciando generación')
             }
 
-            const strategyData = await strategyRes.json()
-            const assignments = strategyData.assignments || []
-            const total = assignments.length
-
-            setGenPieceCount({ total, done: 0 })
-            setGenStatus(`Estrategia lista. Generando ${total} piezas...`)
-            setGenProgress(10)
-
-            // 2. Generate Pieces Loop (One by One)
-            let errors = 0
-            for (let i = 0; i < total; i++) {
-                const assignment = assignments[i]
-                const pieceNum = i + 1
-
-                setGenStatus(`Creando pieza ${pieceNum}/${total}: ${assignment.format} sobre ${assignment.pillar}...`)
-
-                try {
-                    // Call API for single piece
-                    const pieceRes = await fetch(`/api/months/${monthId}/generate-step`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            step: 'piece',
-                            assignment,
-                            pieceNumber: pieceNum,
-                            totalPieces: total
-                        })
-                    })
-
-                    if (!pieceRes.ok) {
-                        const errorPiece = await pieceRes.json()
-                        throw new Error(errorPiece.error || 'Fallo desconocido')
-                    }
-
-                    // Update Progress
-                    setGenPieceCount({ total, done: pieceNum })
-                    const progress = 10 + Math.round((pieceNum / total) * 90)
-                    setGenProgress(progress)
-
-                } catch (pieceError: any) {
-                    console.error(`Error en pieza ${pieceNum}:`, pieceError)
-                    errors++
-                    setGenStatus(`⚠️ Error en pieza ${pieceNum}. Continuando...`)
-                    // Wait a bit so user sees the warning
-                    await new Promise(r => setTimeout(r, 1500))
-                }
-
-                // Small delay to prevent rate limits
-                await new Promise(r => setTimeout(r, 500))
-            }
-
-            // 3. Finalize
-            setGenStatus('✨ Finalizando y guardando...')
-            await fetch(`/api/months/${monthId}/generate-step`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ step: 'finalize' })
-            })
-
-            setGenProgress(100)
-
-            // Refresh Data with check
-            setGenStatus('🔄 verificando piezas...')
-            const newData = await fetchMonth()
-
-            if (newData && newData.pieces && newData.pieces.length > 0) {
-                if (errors > 0) {
-                    setGenStatus(`⚠️ Completado con ${newData.pieces.length} piezas (${errors} errores).`)
-                } else {
-                    setGenStatus(`✅ ¡Éxito! ${newData.pieces.length} piezas generadas correctamente.`)
-                }
-            } else {
-                setGenStatus(`⚠️ La generación terminó pero NO se ven piezas. (Errores: ${errors})`)
-            }
-
-            // Auto-close if success (optional, or let user close with button)
-            if (errors === 0) {
-                // setTimeout(() => setGenerating(false), 2000)
-            }
+            // 2. Immediately refresh status
+            await fetchMonth()
+            setGenStatus('⏳ Trabajo en cola. Las piezas irán apareciendo aquí...')
 
         } catch (err: any) {
             console.error('Error generación:', err)
-            // Show error in overlay DO NOT CLOSE
-            setGenStatus(`❌ Error Crítico: ${err.message}`)
+            setGenerating(false)
+            setGenStatus('')
+            setError(`❌ Error: ${err.message}`)
             // Reset backend state
             fetch(`/api/months/${monthId}/reset`, { method: 'POST' }).catch(() => { })
         }
