@@ -235,25 +235,52 @@ export default function ContentMonthPage() {
     }
 
     const handleRegenerate = async () => {
-        if (!confirm('¿Seguro que quieres borrar todo el contenido actual y regenerar este mes?')) return
+        if (!confirm('¿Seguro que quieres borrar todo el contenido actual y generar este mes?')) return
         setGenerating(true)
         setError('')
+        setLoading(true)
+
         try {
-            const res = await fetch(`/api/months/${monthId}/generate`, {
+            // 1. Reset state
+            await fetch(`/api/months/${monthId}/reset`, { method: 'POST' })
+
+            // 2. Start Strategy
+            const resStrat = await fetch(`/api/months/${monthId}/generate-step`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 'strategy' })
             })
-            if (!res.ok) throw new Error('Error al regenerar')
-            const data = await res.json()
-            if (data.jobId) {
-                setCurrentJobId(data.jobId)
-            } else {
-                fetchMonth()
-                setGenerating(false)
+            if (!resStrat.ok) throw new Error('Error al iniciar estrategia')
+
+            // 3. Generate pieces one by one (Incremental)
+            let currentIdx = 0
+            let completed = false
+            const total = monthData.client?.plan?.postsPerMonth || 12
+
+            while (!completed && currentIdx < 30) { // Limit 30 to avoid infinite loops
+                const resPiece = await fetch(`/api/months/${monthId}/generate-step`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ step: 'piece', pieceIndex: currentIdx })
+                })
+
+                if (!resPiece.ok) throw new Error(`Error en pieza ${currentIdx}`)
+
+                const data = await resPiece.json()
+                completed = data.completed
+                currentIdx = data.nextIndex
+
+                // Update progress visually if we had a state for it
+                console.log(`Progreso: ${data.progress}%`)
             }
+
+            await fetchMonth()
         } catch (err: any) {
             console.error(err)
-            setError(err.message || 'Error al iniciar regeneración')
+            setError(err.message || 'Error en la generación incremental')
+        } finally {
             setGenerating(false)
+            setLoading(false)
         }
     }
 
