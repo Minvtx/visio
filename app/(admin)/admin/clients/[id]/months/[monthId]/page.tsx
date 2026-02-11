@@ -158,6 +158,30 @@ export default function ContentMonthPage() {
         useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
     )
 
+    // --- UTILS ---
+    const safeFetch = async (url: string, options: any, maxRetries = 3) => {
+        let lastError: any;
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const res = await fetch(url, options);
+                if (res.ok) return res;
+
+                // If it's a server error but not a 504/408/502, we might not want to retry
+                // but for AI, sometimes a 500 is just a temporary overload.
+                const data = await res.json().catch(() => ({}));
+                lastError = new Error(data.error || `Error ${res.status}`);
+
+                console.warn(`Attempt ${i + 1} failed: ${lastError.message}. Retrying...`);
+                await new Promise(r => setTimeout(r, 2000)); // wait 2s
+            } catch (err: any) {
+                lastError = err;
+                console.warn(`Attempt ${i + 1} network error: ${err.message}. Retrying...`);
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+        throw lastError;
+    };
+
     const fetchMonth = async () => {
         try {
             const res = await fetch(`/api/months/${monthId}`)
@@ -294,28 +318,23 @@ export default function ContentMonthPage() {
             setGenProgress(2)
 
             // 2. Generate strategy with Claude
-            setGenStatus('🎯 Generando estrategia mensual con IA...')
-            const stratRes = await fetch(`/api/months/${monthId}/generate-step`, {
+            setGenStatus('🎯 Generando estrategia mensual con IA...');
+            const stratRes = await safeFetch(`/api/months/${monthId}/generate-step`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ step: 'strategy' })
-            })
+            });
 
-            if (!stratRes.ok) {
-                const errData = await stratRes.json().catch(() => ({}))
-                throw new Error(errData.error || 'Error al generar estrategia. Verificá que la API key de Anthropic esté configurada.')
-            }
-
-            const stratData = await stratRes.json()
-            const assignments = stratData.assignments || []
-            const total = assignments.length
+            const stratData = await stratRes.json();
+            const assignments = stratData.assignments || [];
+            const total = assignments.length;
 
             if (total === 0) {
-                throw new Error('La IA no generó piezas. Intentá de nuevo.')
+                throw new Error('La IA no generó piezas. Intentá de nuevo.');
             }
 
-            setGenPieceCount({ done: 0, total })
-            setGenProgress(5) // Strategy = 5%
+            setGenPieceCount({ done: 0, total });
+            setGenProgress(5); // Strategy = 5%
 
             // 3. Generate each piece one by one
             let successCount = 0
@@ -326,7 +345,7 @@ export default function ContentMonthPage() {
                 setGenStatus(`✍️ Pieza ${i + 1}/${total}: ${assignment.format} - ${assignment.pillar}`)
 
                 try {
-                    const pieceRes = await fetch(`/api/months/${monthId}/generate-step`, {
+                    const pieceRes = await safeFetch(`/api/months/${monthId}/generate-step`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -335,17 +354,12 @@ export default function ContentMonthPage() {
                             pieceNumber: i + 1,
                             totalPieces: total
                         })
-                    })
+                    });
 
-                    if (!pieceRes.ok) {
-                        console.error(`Pieza ${i + 1} falló, continuando...`)
-                        failCount++
-                    } else {
-                        successCount++
-                    }
+                    successCount++;
                 } catch (pieceErr) {
-                    console.error(`Pieza ${i + 1} error de red:`, pieceErr)
-                    failCount++
+                    console.error(`Pieza ${i + 1} falló definitivamente después de reintentos:`, pieceErr);
+                    failCount++;
                 }
 
                 setGenPieceCount({ done: i + 1, total })

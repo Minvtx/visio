@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-export const maxDuration = 10; // Vercel Hobby safe
+export const maxDuration = 60; // Increased for Pro / Faster processing
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
