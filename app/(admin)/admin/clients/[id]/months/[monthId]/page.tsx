@@ -314,8 +314,15 @@ export default function ContentMonthPage() {
             })
 
             if (!response.ok) {
-                const errData = await response.json().catch(() => ({}))
-                throw new Error(errData.error || `Error ${response.status}`)
+                // Si falla el inicio del stream
+                let msg = `Error del servidor (${response.status})`
+                try {
+                    const errData = await response.json()
+                    msg = errData.error || msg
+                } catch (e) { }
+
+                if (response.status === 504) msg = "Timeout de Vercel (10s). Posiblemente el plan Pro no se aplicó al deploy o no se hizo el deploy de Producción."
+                throw new Error(msg)
             }
 
             const reader = response.body?.getReader()
