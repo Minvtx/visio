@@ -353,9 +353,15 @@ class ContentGenerator {
         for (const model of MODELS) {
             try {
                 console.log(`[ContentGenerator] Attempting with model: ${model} (Tools Mode)`)
+
+                // Determine appropriate token limit
+                let maxTokens = 8192
+                if (model.includes('sonnet-4')) maxTokens = 20000 // Higher limit for newer model
+                if (model.includes('haiku')) maxTokens = 4096
+
                 const response = await client.messages.create({
                     model,
-                    max_tokens: 8192,
+                    max_tokens: maxTokens,
                     temperature: 0.7,
                     system: systemPrompt,
                     tools: [contentTool as any],
