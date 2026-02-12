@@ -44,6 +44,15 @@ function extractJson(text: string): any {
     }
 }
 
+// Wrapper for backward compatibility (used by other API routes)
+export async function generateSinglePiece(
+    req: PieceRequest,
+    workspaceId?: string
+): Promise<GeneratedPiece> {
+    const concept = await generatePieceConcept(req, workspaceId);
+    return await generatePieceDetails(concept, req, workspaceId);
+}
+
 // 1. Generate Concept (Fast, < 5s)
 export async function generatePieceConcept(
     req: PieceRequest,
