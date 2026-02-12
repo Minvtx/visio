@@ -282,8 +282,16 @@ export default function ClientDetailPage() {
             })
 
             if (!stratRes.ok) {
-                const errData = await stratRes.json()
-                throw new Error(errData.error || 'Error al generar estrategia')
+                let errorMsg = 'Error al generar estrategia'
+                try {
+                    const errData = await stratRes.json()
+                    errorMsg = errData.error || errorMsg
+                } catch (e) {
+                    const text = await stratRes.text()
+                    console.error("Non-JSON error response (Strategy):", stratRes.status, text)
+                    errorMsg = `Error ${stratRes.status}: ${stratRes.statusText} (Posible Timeout)`
+                }
+                throw new Error(errorMsg)
             }
 
             const stratData = await stratRes.json()
@@ -319,7 +327,18 @@ export default function ClientDetailPage() {
                             })
                         })
 
-                        if (!pieceRes.ok) throw new Error("Failed to generate piece")
+                        if (!pieceRes.ok) {
+                            let pieceErr = 'Failed to generate piece'
+                            try {
+                                const errJson = await pieceRes.json()
+                                pieceErr = errJson.error || pieceErr
+                            } catch {
+                                // Ignore non-json error on piece, just retry
+                                console.warn(`Piece ${i + 1} failed with non-JSON status ${pieceRes.status}`)
+                                pieceErr = `Error ${pieceRes.status}`
+                            }
+                            throw new Error(pieceErr)
+                        }
                         success = true
                     } catch (e) {
                         console.error(`Error generating piece ${i + 1}, retry ${retries + 1}`, e)
