@@ -334,7 +334,7 @@ class ContentGenerator {
             throw new Error('No text response from Claude')
         }
 
-        // Parse JSON response
+        // Parse JSON response safely
         let jsonText = textContent.text.trim()
 
         // Remove markdown code blocks if present
@@ -344,7 +344,40 @@ class ContentGenerator {
             jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
         }
 
-        const result = JSON.parse(jsonText)
+        let result: any
+        try {
+            result = JSON.parse(jsonText)
+        } catch (e) {
+            console.warn("[ContentGenerator] JSON parse failed, attempting repair of truncated JSON...", e)
+            try {
+                // Basic repair for truncated JSON
+                // 1. If it ends with specific characters, try to close them
+                // This is a naive heuristic but works for simple cut-offs
+                let repaired = jsonText
+                // Count brackets
+                const openBraces = (repaired.match(/{/g) || []).length
+                const closeBraces = (repaired.match(/}/g) || []).length
+                const openBrackets = (repaired.match(/\[/g) || []).length
+                const closeBrackets = (repaired.match(/\]/g) || []).length
+
+                // If we are inside a string (odd number of quotes), close it
+                const quotes = (repaired.match(/"/g) || []).length
+                if (quotes % 2 !== 0) {
+                    repaired += '"'
+                }
+
+                // Close arrays and objects
+                for (let i = 0; i < (openBrackets - closeBrackets); i++) repaired += ']'
+                for (let i = 0; i < (openBraces - closeBraces); i++) repaired += '}'
+
+                result = JSON.parse(repaired)
+                console.log("[ContentGenerator] JSON repaired successfully.")
+            } catch (repairError) {
+                console.error("[ContentGenerator] Fatal: Could not repair JSON.", repairError)
+                console.error("[ContentGenerator] Raw Output Hint:", jsonText.slice(-100))
+                throw new Error("La IA generó una respuesta inválida o incompleta on JSON. Por favor intenta de nuevo.")
+            }
+        }
 
         const tokensUsed = response.usage.input_tokens + response.usage.output_tokens
         const duration = Date.now() - startTime
