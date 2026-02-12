@@ -270,756 +270,798 @@ export default function ClientDetailPage() {
         if (!createdMonthId) return
         setGenerating(true)
         setShowStrategyModal(false)
-        setGenProgress(0)
-        setGenStatus('Preparando...')
+        setGenProgress(5)
+        setGenStatus('Iniciando generación completa (Vercel Pro Mode)...')
         setGenPieceCount({ done: 0, total: 0 })
 
         try {
-            // 1. Generate strategy with Claude (~5s)
-            setGenStatus('🎯 Generando estrategia mensual con IA...')
-            const stratRes = await fetch(`/api/months/${createdMonthId}/generate-strategy`, {
+            // Fake progress animation for 30-45s
+            const interval = setInterval(() => {
+                setGenProgress((prev) => {
+                    if (prev >= 90) return prev
+                    return prev + (prev < 50 ? 5 : 2)
+                })
+                setGenStatus((prev) => {
+                    if (prev.includes("Iniciando")) return "Escribiendo estrategia y pilares..."
+                    if (prev.includes("Estrategia")) return "Diseñando piezas de contenido..."
+                    if (prev.includes("Diseñando")) return "Redactando copys y hashtags..."
+                    return prev
+                })
+            }, 2500)
+
+            const res = await fetch(`/api/months/${createdMonthId}/generate`, {
                 method: 'POST',
             })
 
-            if (!stratRes.ok) {
-                const errorText = await stratRes.text()
-                let errorMsg = `Error ${stratRes.status}: ${stratRes.statusText}`
+            clearInterval(interval)
+
+            if (!res.ok) {
+                const errorText = await res.text()
+                let errorMsg = `Error ${res.status}: ${res.statusText}`
                 try {
                     const errData = JSON.parse(errorText)
                     errorMsg = errData.error || errorMsg
                 } catch {
-                    console.error("Non-JSON error response (Strategy):", errorText.slice(0, 200))
-                    if (stratRes.status === 504) errorMsg = "Error: Tiempo de espera agotado (Timeout). Intenta de nuevo."
+                    console.error("Non-JSON error response:", errorText.slice(0, 200))
                 }
                 throw new Error(errorMsg)
             }
 
-            const stratData = await stratRes.json()
-            // Strategy endpoint ensures 'pieceAssignments' exists and is normalized
-            const assignments = stratData.strategy.pieceAssignments || []
-            const total = assignments.length
-            setGenPieceCount({ done: 0, total })
-            setGenProgress(5)
-
-            if (total === 0) {
-                throw new Error("La estrategia no generó asignaciones de contenido.")
-            }
-
-            // 2. Generate each piece one by one
-            for (let i = 0; i < assignments.length; i++) {
-                const assignment = assignments[i]
-                setGenStatus(`✍️ Pieza ${i + 1}/${total}: ${assignment.format} - ${assignment.pillar}`)
-
-                // Retry logic for pieces
-                let retries = 0
-                let success = false
-
-                while (!success && retries < 2) {
-                    try {
-                        const pieceRes = await fetch(`/api/pieces/generate-single`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                monthId: createdMonthId,
-                                assignment,
-                                pieceIndex: i,
-                                totalPieces: total
-                            })
-                        })
-
-                        if (!pieceRes.ok) {
-                            let pieceErr = 'Failed to generate piece'
-                            try {
-                                const errJson = await pieceRes.json()
-                                pieceErr = errJson.error || pieceErr
-                            } catch {
-                                // Ignore non-json error on piece, just retry
-                                console.warn(`Piece ${i + 1} failed with non-JSON status ${pieceRes.status}`)
-                                pieceErr = `Error ${pieceRes.status}`
-                            }
-                            throw new Error(pieceErr)
-                        }
-                        success = true
-                    } catch (e) {
-                        console.error(`Error generating piece ${i + 1}, retry ${retries + 1}`, e)
-                        retries++
-                        // Wait 2s before retry
-                        await new Promise(r => setTimeout(r, 2000))
-                    }
-                }
-
-                if (!success) {
-                    console.error(`Failed piece ${i + 1} after retries, skipping...`)
-                    // Optionally: continue or throw. We continue to generate what we can.
-                }
-
-                setGenPieceCount({ done: i + 1, total })
-                setGenProgress(5 + Math.round(((i + 1) / total) * 90))
-            }
-
-            // 3. Finalize - Just mark as generated
-            setGenStatus('✅ Finalizando...')
-            // We can reuse a simple update call or recreate a small finalize endpoint. 
-            // faster to just call a PATCH on the month if we have an endpoint for it, 
-            // or use the server action pattern. 
-            // For now, I'll use the existing generic PATCH or the finalize step if I kept it?
-            // Actually, let's just update the status via the extensive PATCH endpoint or a simple one.
-            // I'll assume standard PATCH /api/months/[id] works for status update based on other code.
-            await fetch(`/api/months/${createdMonthId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'GENERATED', generatedAt: new Date() })
-            })
+            const data = await res.json()
 
             setGenProgress(100)
-            setGenStatus('🎉 ¡Contenido generado!')
+            setGenStatus(`🎉 ¡Contenido generado! (${data.count || 'varias'} piezas)`)
             setCreatedMonthId(null)
             await fetchClient()
 
         } catch (error: any) {
             console.error(error)
             setError(error.message || 'Error fatal al generar')
-            // Don't close generating automatically so user sees error
+            setGenStatus('❌ Error')
         } finally {
-            setTimeout(() => setGenerating(false), 1500)
+            setTimeout(() => setGenerating(false), 2000)
         }
     }
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-        )
+    if (!stratRes.ok) {
+        const errorText = await stratRes.text()
+        let errorMsg = `Error ${stratRes.status}: ${stratRes.statusText}`
+        try {
+            const errData = JSON.parse(errorText)
+            errorMsg = errData.error || errorMsg
+        } catch {
+            console.error("Non-JSON error response (Strategy):", errorText.slice(0, 200))
+            if (stratRes.status === 504) errorMsg = "Error: Tiempo de espera agotado (Timeout). Intenta de nuevo."
+        }
+        throw new Error(errorMsg)
     }
 
-    if (!client) {
-        return (
-            <div className="text-center py-12">
-                <h2 className="text-xl font-semibold mb-2">Cliente no encontrado</h2>
-                <Link href="/admin/clients">
-                    <Button variant="outline">Volver a Clientes</Button>
-                </Link>
-            </div>
-        )
+    const stratData = await stratRes.json()
+    // Strategy endpoint ensures 'pieceAssignments' exists and is normalized
+    const assignments = stratData.strategy.pieceAssignments || []
+    const total = assignments.length
+    setGenPieceCount({ done: 0, total })
+    setGenProgress(5)
+
+    if (total === 0) {
+        throw new Error("La estrategia no generó asignaciones de contenido.")
     }
 
-    const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    const totalPieces = client.contentMonths.reduce((acc, m) => acc + (m._count?.pieces || 0), 0)
-    const piecesPerMonth = client.plan ? (client.plan.totalPieces || (client.plan.postsPerMonth + client.plan.carouselsPerMonth + client.plan.reelsPerMonth + client.plan.storiesPerMonth)) : 0
+    // 2. Generate each piece one by one
+    for (let i = 0; i < assignments.length; i++) {
+        const assignment = assignments[i]
+        setGenStatus(`✍️ Pieza ${i + 1}/${total}: ${assignment.format} - ${assignment.pillar}`)
 
+        // Retry logic for pieces
+        let retries = 0
+        let success = false
+
+        while (!success && retries < 2) {
+            try {
+                const pieceRes = await fetch(`/api/pieces/generate-single`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        monthId: createdMonthId,
+                        assignment,
+                        pieceIndex: i,
+                        totalPieces: total
+                    })
+                })
+
+                if (!pieceRes.ok) {
+                    let pieceErr = 'Failed to generate piece'
+                    try {
+                        const errJson = await pieceRes.json()
+                        pieceErr = errJson.error || pieceErr
+                    } catch {
+                        // Ignore non-json error on piece, just retry
+                        console.warn(`Piece ${i + 1} failed with non-JSON status ${pieceRes.status}`)
+                        pieceErr = `Error ${pieceRes.status}`
+                    }
+                    throw new Error(pieceErr)
+                }
+                success = true
+            } catch (e) {
+                console.error(`Error generating piece ${i + 1}, retry ${retries + 1}`, e)
+                retries++
+                // Wait 2s before retry
+                await new Promise(r => setTimeout(r, 2000))
+            }
+        }
+
+        if (!success) {
+            console.error(`Failed piece ${i + 1} after retries, skipping...`)
+            // Optionally: continue or throw. We continue to generate what we can.
+        }
+
+        setGenPieceCount({ done: i + 1, total })
+        setGenProgress(5 + Math.round(((i + 1) / total) * 90))
+    }
+
+    // 3. Finalize - Just mark as generated
+    setGenStatus('✅ Finalizando...')
+    // We can reuse a simple update call or recreate a small finalize endpoint. 
+    // faster to just call a PATCH on the month if we have an endpoint for it, 
+    // or use the server action pattern. 
+    // For now, I'll use the existing generic PATCH or the finalize step if I kept it?
+    // Actually, let's just update the status via the extensive PATCH endpoint or a simple one.
+    // I'll assume standard PATCH /api/months/[id] works for status update based on other code.
+    await fetch(`/api/months/${createdMonthId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'GENERATED', generatedAt: new Date() })
+    })
+
+    setGenProgress(100)
+    setGenStatus('🎉 ¡Contenido generado!')
+    setCreatedMonthId(null)
+    await fetchClient()
+
+} catch (error: any) {
+    console.error(error)
+    setError(error.message || 'Error fatal al generar')
+    // Don't close generating automatically so user sees error
+} finally {
+    setTimeout(() => setGenerating(false), 1500)
+}
+    }
+
+if (loading) {
     return (
-        <div className="space-y-6">
-            {showOnboarding ? (
-                <div>
-                    <Button
-                        variant="ghost"
-                        onClick={() => setShowOnboarding(false)}
-                        className="mb-4"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Volver al Dashboard
-                    </Button>
-                    <ClientOnboardingWizard
-                        clientId={clientId}
-                        initialData={{
-                            ...client.brandKit,
-                            ...client.knowledgeBase,
-                            country: client.country,
-                            city: client.city,
-                            dialect: client.dialect,
-                        }}
-                        onComplete={() => {
-                            setShowOnboarding(false)
-                            fetchClient()
-                        }}
-                    />
-                </div>
-            ) : (
-                <>
-                    {/* Back Button */}
-                    <Link
-                        href="/admin/clients"
-                        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Volver a Clientes
-                    </Link>
+        <div className="flex items-center justify-center min-h-[400px]">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+    )
+}
 
-                    {/* Global Error Banner */}
-                    {/* Global Error Banner */}
-                    {error && !showGenerateModal && !showStrategyModal && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-lg flex items-center justify-between mb-4 animate-in fade-in slide-in-from-top-2">
-                            <div className="flex items-center gap-2">
-                                <X className="w-5 h-5" />
-                                <span className="font-medium">{error}</span>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => setError('')} className="hover:bg-red-500/10 text-red-500">
-                                <X className="w-4 h-4" />
-                            </Button>
+if (!client) {
+    return (
+        <div className="text-center py-12">
+            <h2 className="text-xl font-semibold mb-2">Cliente no encontrado</h2>
+            <Link href="/admin/clients">
+                <Button variant="outline">Volver a Clientes</Button>
+            </Link>
+        </div>
+    )
+}
+
+const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+const totalPieces = client.contentMonths.reduce((acc, m) => acc + (m._count?.pieces || 0), 0)
+const piecesPerMonth = client.plan ? (client.plan.totalPieces || (client.plan.postsPerMonth + client.plan.carouselsPerMonth + client.plan.reelsPerMonth + client.plan.storiesPerMonth)) : 0
+
+return (
+    <div className="space-y-6">
+        {showOnboarding ? (
+            <div>
+                <Button
+                    variant="ghost"
+                    onClick={() => setShowOnboarding(false)}
+                    className="mb-4"
+                >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Volver al Dashboard
+                </Button>
+                <ClientOnboardingWizard
+                    clientId={clientId}
+                    initialData={{
+                        ...client.brandKit,
+                        ...client.knowledgeBase,
+                        country: client.country,
+                        city: client.city,
+                        dialect: client.dialect,
+                    }}
+                    onComplete={() => {
+                        setShowOnboarding(false)
+                        fetchClient()
+                    }}
+                />
+            </div>
+        ) : (
+            <>
+                {/* Back Button */}
+                <Link
+                    href="/admin/clients"
+                    className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Volver a Clientes
+                </Link>
+
+                {/* Global Error Banner */}
+                {/* Global Error Banner */}
+                {error && !showGenerateModal && !showStrategyModal && (
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-lg flex items-center justify-between mb-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center gap-2">
+                            <X className="w-5 h-5" />
+                            <span className="font-medium">{error}</span>
                         </div>
-                    )}
+                        <Button variant="ghost" size="sm" onClick={() => setError('')} className="hover:bg-red-500/10 text-red-500">
+                            <X className="w-4 h-4" />
+                        </Button>
+                    </div>
+                )}
 
-                    {/* Client Header */}
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white text-xl font-bold">
-                                {initials}
+                {/* Client Header */}
+                <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white text-xl font-bold">
+                            {initials}
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold">{client.name}</h1>
+                            <div className="flex items-center gap-3 mt-1">
+                                <span className="text-muted-foreground">{client.industry || 'Sin industria'}</span>
+                                <button
+                                    onClick={() => setShowPlanModal(true)}
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${client.plan
+                                        ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                        : 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
+                                        } transition-colors`}
+                                >
+                                    {client.plan ? `Plan ${client.plan.name}` : '⚠️ Sin plan asignado'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setShowPlanModal(true)}>
+                            <Package className="w-4 h-4 mr-2" />
+                            Cambiar Plan
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setShowOnboarding(true)}>
+                            <Bot className="w-4 h-4 mr-2" />
+                            Configurar Agente
+                        </Button>
+                        {!client.googleDriveFolderId && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleInitDrive}
+                                disabled={initializingDrive}
+                                className="border-blue-500/30 text-blue-600 hover:bg-blue-500/5"
+                            >
+                                {initializingDrive ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                    <ImageIcon className="w-4 h-4 mr-2" />
+                                )}
+                                Vincular Drive
+                            </Button>
+                        )}
+                        {client.googleDriveFolderId && (
+                            <Link href={`https://drive.google.com/drive/folders/${client.googleDriveFolderId}`} target="_blank">
+                                <Button variant="outline" size="sm" className="border-emerald-500/30 text-emerald-600">
+                                    <ImageIcon className="w-4 h-4 mr-2" />
+                                    Ver en Drive
+                                </Button>
+                            </Link>
+                        )}
+                        <Button
+                            size="sm"
+                            onClick={() => setShowGenerateModal(true)}
+                            disabled={!client.plan}
+                            title={!client.plan ? 'Asigna un plan primero' : ''}
+                        >
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Generar Nuevo Mes
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Plan Stats */}
+                {client.plan && (
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Package className="w-5 h-5 text-primary" />
+                                    <div>
+                                        <span className="font-semibold">Plan {client.plan.name}</span>
+                                        <span className="text-muted-foreground ml-2">
+                                            • {client.plan.totalPieces || (client.plan.postsPerMonth + client.plan.carouselsPerMonth + client.plan.reelsPerMonth + client.plan.storiesPerMonth)} piezas/mes
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-4 text-sm">
+                                    <span className="px-2 py-1 bg-background rounded">{client.plan.postsPerMonth} Posts</span>
+                                    <span className="px-2 py-1 bg-background rounded">{client.plan.carouselsPerMonth} Carruseles</span>
+                                    <span className="px-2 py-1 bg-background rounded">{client.plan.reelsPerMonth} Reels</span>
+                                    <span className="px-2 py-1 bg-background rounded">{client.plan.storiesPerMonth} Stories</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Stats Row */}
+                <div className="grid grid-cols-3 gap-4">
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <Calendar className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold">{client.name}</h1>
-                                <div className="flex items-center gap-3 mt-1">
-                                    <span className="text-muted-foreground">{client.industry || 'Sin industria'}</span>
-                                    <button
-                                        onClick={() => setShowPlanModal(true)}
-                                        className={`px-2 py-1 rounded-full text-xs font-medium ${client.plan
-                                            ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                                            : 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
-                                            } transition-colors`}
-                                    >
-                                        {client.plan ? `Plan ${client.plan.name}` : '⚠️ Sin plan asignado'}
-                                    </button>
-                                </div>
+                                <div className="text-2xl font-bold">{client.contentMonths.length}</div>
+                                <div className="text-sm text-muted-foreground">Meses</div>
                             </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setShowPlanModal(true)}>
-                                <Package className="w-4 h-4 mr-2" />
-                                Cambiar Plan
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => setShowOnboarding(true)}>
-                                <Bot className="w-4 h-4 mr-2" />
-                                Configurar Agente
-                            </Button>
-                            {!client.googleDriveFolderId && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleInitDrive}
-                                    disabled={initializingDrive}
-                                    className="border-blue-500/30 text-blue-600 hover:bg-blue-500/5"
-                                >
-                                    {initializingDrive ? (
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    ) : (
-                                        <ImageIcon className="w-4 h-4 mr-2" />
-                                    )}
-                                    Vincular Drive
-                                </Button>
-                            )}
-                            {client.googleDriveFolderId && (
-                                <Link href={`https://drive.google.com/drive/folders/${client.googleDriveFolderId}`} target="_blank">
-                                    <Button variant="outline" size="sm" className="border-emerald-500/30 text-emerald-600">
-                                        <ImageIcon className="w-4 h-4 mr-2" />
-                                        Ver en Drive
-                                    </Button>
-                                </Link>
-                            )}
-                            <Button
-                                size="sm"
-                                onClick={() => setShowGenerateModal(true)}
-                                disabled={!client.plan}
-                                title={!client.plan ? 'Asigna un plan primero' : ''}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <FileText className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold">{totalPieces}</div>
+                                <div className="text-sm text-muted-foreground">Piezas Totales</div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                <span className="text-emerald-500 font-bold">%</span>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold">-</div>
+                                <div className="text-sm text-muted-foreground">Tasa Aprobación</div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Tabs */}
+                <div className="border-b border-border">
+                    <nav className="flex gap-1">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
+                                    ? 'border-primary text-foreground'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                                    }`}
                             >
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Generar Nuevo Mes
-                            </Button>
+                                <tab.icon className="w-4 h-4" />
+                                {tab.label}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+
+                {/* Tab Content */}
+                {activeTab === 'months' && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">Historial de Meses</h2>
                         </div>
-                    </div>
 
-                    {/* Plan Stats */}
-                    {client.plan && (
-                        <Card className="border-primary/20 bg-primary/5">
-                            <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <Package className="w-5 h-5 text-primary" />
-                                        <div>
-                                            <span className="font-semibold">Plan {client.plan.name}</span>
-                                            <span className="text-muted-foreground ml-2">
-                                                • {client.plan.totalPieces || (client.plan.postsPerMonth + client.plan.carouselsPerMonth + client.plan.reelsPerMonth + client.plan.storiesPerMonth)} piezas/mes
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4 text-sm">
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.postsPerMonth} Posts</span>
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.carouselsPerMonth} Carruseles</span>
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.reelsPerMonth} Reels</span>
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.storiesPerMonth} Stories</span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                        {/* Months List */}
+                        {client.contentMonths.length === 0 ? (
+                            <Card className="p-8 text-center">
+                                <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                                <h3 className="text-lg font-semibold mb-2">Sin meses de contenido</h3>
+                                <p className="text-muted-foreground mb-4">
+                                    Genera tu primer mes de contenido con IA
+                                </p>
+                                <Button onClick={() => setShowGenerateModal(true)}>
+                                    <Sparkles className="w-4 h-4 mr-2" />
+                                    Generar Primer Mes
+                                </Button>
+                            </Card>
+                        ) : (
+                            <div className="space-y-3">
+                                {client.contentMonths.map((month) => (
+                                    <Card key={month.id} className="hover:border-primary/50 transition-all group relative overflow-hidden">
+                                        {/* Full card clickable link */}
+                                        <Link
+                                            href={`/admin/clients/${client.id}/months/${month.id}`}
+                                            className="absolute inset-0 z-10 focus:outline-none"
+                                        >
+                                            <span className="sr-only">Ver mes {MONTH_NAMES[month.month]}</span>
+                                        </Link>
 
-                    {/* Stats Row */}
-                    <div className="grid grid-cols-3 gap-4">
-                        <Card>
-                            <CardContent className="p-4 flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                    <Calendar className="w-5 h-5 text-primary" />
-                                </div>
-                                <div>
-                                    <div className="text-2xl font-bold">{client.contentMonths.length}</div>
-                                    <div className="text-sm text-muted-foreground">Meses</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4 flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                    <FileText className="w-5 h-5 text-primary" />
-                                </div>
-                                <div>
-                                    <div className="text-2xl font-bold">{totalPieces}</div>
-                                    <div className="text-sm text-muted-foreground">Piezas Totales</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4 flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                                    <span className="text-emerald-500 font-bold">%</span>
-                                </div>
-                                <div>
-                                    <div className="text-2xl font-bold">-</div>
-                                    <div className="text-sm text-muted-foreground">Tasa Aprobación</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className="border-b border-border">
-                        <nav className="flex gap-1">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
-                                        ? 'border-primary text-foreground'
-                                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                                        }`}
-                                >
-                                    <tab.icon className="w-4 h-4" />
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </nav>
-                    </div>
-
-                    {/* Tab Content */}
-                    {activeTab === 'months' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-lg font-semibold">Historial de Meses</h2>
-                            </div>
-
-                            {/* Months List */}
-                            {client.contentMonths.length === 0 ? (
-                                <Card className="p-8 text-center">
-                                    <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                                    <h3 className="text-lg font-semibold mb-2">Sin meses de contenido</h3>
-                                    <p className="text-muted-foreground mb-4">
-                                        Genera tu primer mes de contenido con IA
-                                    </p>
-                                    <Button onClick={() => setShowGenerateModal(true)}>
-                                        <Sparkles className="w-4 h-4 mr-2" />
-                                        Generar Primer Mes
-                                    </Button>
-                                </Card>
-                            ) : (
-                                <div className="space-y-3">
-                                    {client.contentMonths.map((month) => (
-                                        <Card key={month.id} className="hover:border-primary/50 transition-all group relative overflow-hidden">
-                                            {/* Full card clickable link */}
-                                            <Link
-                                                href={`/admin/clients/${client.id}/months/${month.id}`}
-                                                className="absolute inset-0 z-10 focus:outline-none"
-                                            >
-                                                <span className="sr-only">Ver mes {MONTH_NAMES[month.month]}</span>
-                                            </Link>
-
-                                            <CardContent className="p-4 flex items-center justify-between">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
-                                                        <Calendar className="w-5 h-5 text-muted-foreground" />
+                                        <CardContent className="p-4 flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
+                                                    <Calendar className="w-5 h-5 text-muted-foreground" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold group-hover:text-primary transition-colors">
+                                                        {MONTH_NAMES[month.month]} {month.year}
                                                     </div>
-                                                    <div>
-                                                        <div className="font-semibold group-hover:text-primary transition-colors">
-                                                            {MONTH_NAMES[month.month]} {month.year}
-                                                        </div>
-                                                        <div className="text-sm text-muted-foreground">
-                                                            {month._count?.pieces || 0} piezas
-                                                        </div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        {month._count?.pieces || 0} piezas
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-4">
-                                                    <StatusBadge status={month.status} />
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <StatusBadge status={month.status} />
 
-                                                    {/* Actions - elevated z-index to be clickable above the link */}
-                                                    <div className="relative z-20 flex items-center gap-1">
-                                                        {month.status === 'EXPORTED' && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={(e) => e.preventDefault()}
-                                                            >
-                                                                <Download className="w-4 h-4" />
-                                                            </Button>
-                                                        )}
+                                                {/* Actions - elevated z-index to be clickable above the link */}
+                                                <div className="relative z-20 flex items-center gap-1">
+                                                    {month.status === 'EXPORTED' && (
                                                         <Button
                                                             variant="ghost"
-                                                            size="icon"
-                                                            disabled={deletingId === month.id}
-                                                            className={`h-8 w-8 ${month.status === 'GENERATING'
-                                                                ? "text-red-600 bg-red-100 hover:bg-red-200 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40"
-                                                                : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                                                                }`}
-                                                            onClick={(e) => handleDeleteMonth(month.id, e)}
-                                                            title={month.status === 'GENERATING' ? "Eliminar para reiniciar" : "Eliminar mes"}
+                                                            size="sm"
+                                                            onClick={(e) => e.preventDefault()}
                                                         >
-                                                            {deletingId === month.id ? (
-                                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                            ) : (
-                                                                <X className="w-4 h-4" />
-                                                            )}
+                                                            <Download className="w-4 h-4" />
                                                         </Button>
-                                                    </div>
-
-                                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        disabled={deletingId === month.id}
+                                                        className={`h-8 w-8 ${month.status === 'GENERATING'
+                                                            ? "text-red-600 bg-red-100 hover:bg-red-200 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40"
+                                                            : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                                            }`}
+                                                        onClick={(e) => handleDeleteMonth(month.id, e)}
+                                                        title={month.status === 'GENERATING' ? "Eliminar para reiniciar" : "Eliminar mes"}
+                                                    >
+                                                        {deletingId === month.id ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <X className="w-4 h-4" />
+                                                        )}
+                                                    </Button>
                                                 </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
 
-                    {activeTab === 'brandkit' && (
-                        <BrandKitEditor
-                            clientId={clientId}
-                            initialData={{
-                                tone: client.brandKit?.primaryTone || client.brandKit?.tone || '',
-                                personality: client.brandKit?.brandPersonality || [],
-                                guardrails: client.brandKit?.guardrails || [],
-                                forbiddenWords: client.brandKit?.forbiddenWords || [],
-                                requiredHashtags: client.brandKit?.requiredHashtags || [],
-                                samplePhrases: client.brandKit?.voiceDescription ? client.brandKit.voiceDescription.split('\n').filter(Boolean) : [],
-                            }}
-                            onSave={fetchClient}
-                        />
-                    )}
-
-                    {activeTab === 'knowledge' && (
-                        <KnowledgeBaseEditor
-                            clientId={clientId}
-                            initialData={{
-                                about: client.knowledgeBase?.about || '',
-                                mission: client.knowledgeBase?.history || '',
-                                uniqueValue: (client.knowledgeBase?.customFields as any)?.uniqueValue || '',
-                                targetAudience: client.knowledgeBase?.targetAudiences as any || [],
-                                products: client.knowledgeBase?.products as any || [],
-                                competitors: client.knowledgeBase?.competitors || [],
-                            }}
-                            onSave={fetchClient}
-                        />
-                    )}
-
-                    {activeTab === 'assets' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Assets ({assets.length})</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <AssetUploader
-                                    clientId={clientId}
-                                    assets={assets}
-                                    onUploadComplete={fetchAssets}
-                                    onDelete={() => fetchAssets()}
-                                />
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Generate Month Modal */}
-                    {showGenerateModal && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-background border border-border rounded-2xl w-full max-w-md shadow-xl">
-                                <div className="flex items-center justify-between p-6 border-b border-border">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                                            <Sparkles className="w-5 h-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-xl font-semibold">Generar Mes con IA</h2>
-                                            <p className="text-sm text-muted-foreground">Content Wizard creará todo el contenido</p>
-                                        </div>
-                                    </div>
-                                    <Button variant="ghost" size="sm" onClick={() => setShowGenerateModal(false)} disabled={generating}>
-                                        <X className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                                <div className="p-6 space-y-4">
-                                    {error && (
-                                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
-                                            {error}
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Mes</label>
-                                            <select
-                                                value={generateForm.month}
-                                                onChange={(e) => setGenerateForm({ ...generateForm, month: Number(e.target.value) })}
-                                                className="w-full px-4 py-2 bg-secondary border border-border rounded-lg"
-                                                disabled={generating}
-                                            >
-                                                {MONTH_NAMES.slice(1).map((name, i) => (
-                                                    <option key={i + 1} value={i + 1}>{name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Año</label>
-                                            <select
-                                                value={generateForm.year}
-                                                onChange={(e) => setGenerateForm({ ...generateForm, year: Number(e.target.value) })}
-                                                className="w-full px-4 py-2 bg-secondary border border-border rounded-lg"
-                                                disabled={generating}
-                                            >
-                                                <option value={2025}>2025</option>
-                                                <option value={2026}>2026</option>
-                                                <option value={2027}>2027</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                                        <h4 className="font-medium mb-2">Lo que se generará:</h4>
-                                        <ul className="text-sm text-muted-foreground space-y-1">
-                                            <li>• Estrategia mensual con pilares de contenido</li>
-                                            <li>• {piecesPerMonth > 0 ? `~${piecesPerMonth}` : 'Varias'} piezas de contenido (posts, carruseles, reels, stories)</li>
-                                            <li>• Hooks, captions, CTAs y hashtags para cada pieza</li>
-                                            <li>• Conceptos visuales para el diseñador</li>
-                                        </ul>
-                                    </div>
-
-                                    <div className="flex gap-3 pt-4">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setShowGenerateModal(false)}
-                                            className="flex-1"
-                                            disabled={generating}
-                                        >
-                                            Cancelar
-                                        </Button>
-                                        <Button
-                                            onClick={handleCreateMonth}
-                                            disabled={generating}
-                                            className="flex-1"
-                                        >
-                                            {generating ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                    Generando...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    Siguiente: Estrategia
-                                                    <ChevronRight className="w-4 h-4 ml-2" />
-                                                </>
-                                            )}
-                                        </Button>
-                                    </div>
-
-                                    {generating && (
-                                        <div className="text-center text-sm text-muted-foreground">
-                                            Creando borrador...
-                                        </div>
-                                    )}
-                                </div>
+                                                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+                )}
 
-                    {/* Strategy Planner Modal */}
-                    {showStrategyModal && createdMonthId && (
-                        <div className="fixed inset-0 bg-background z-50 p-4 overflow-y-auto">
-                            <div className="max-w-4xl mx-auto pt-8">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-                                            <Target className="w-6 h-6 text-white" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-2xl font-bold">Definir Estrategia Mensual</h2>
-                                            <p className="text-muted-foreground">Antes de generar, define el rumbo del mes.</p>
-                                        </div>
+                {activeTab === 'brandkit' && (
+                    <BrandKitEditor
+                        clientId={clientId}
+                        initialData={{
+                            tone: client.brandKit?.primaryTone || client.brandKit?.tone || '',
+                            personality: client.brandKit?.brandPersonality || [],
+                            guardrails: client.brandKit?.guardrails || [],
+                            forbiddenWords: client.brandKit?.forbiddenWords || [],
+                            requiredHashtags: client.brandKit?.requiredHashtags || [],
+                            samplePhrases: client.brandKit?.voiceDescription ? client.brandKit.voiceDescription.split('\n').filter(Boolean) : [],
+                        }}
+                        onSave={fetchClient}
+                    />
+                )}
+
+                {activeTab === 'knowledge' && (
+                    <KnowledgeBaseEditor
+                        clientId={clientId}
+                        initialData={{
+                            about: client.knowledgeBase?.about || '',
+                            mission: client.knowledgeBase?.history || '',
+                            uniqueValue: (client.knowledgeBase?.customFields as any)?.uniqueValue || '',
+                            targetAudience: client.knowledgeBase?.targetAudiences as any || [],
+                            products: client.knowledgeBase?.products as any || [],
+                            competitors: client.knowledgeBase?.competitors || [],
+                        }}
+                        onSave={fetchClient}
+                    />
+                )}
+
+                {activeTab === 'assets' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Assets ({assets.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <AssetUploader
+                                clientId={clientId}
+                                assets={assets}
+                                onUploadComplete={fetchAssets}
+                                onDelete={() => fetchAssets()}
+                            />
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Generate Month Modal */}
+                {showGenerateModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-background border border-border rounded-2xl w-full max-w-md shadow-xl">
+                            <div className="flex items-center justify-between p-6 border-b border-border">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                                        <Sparkles className="w-5 h-5 text-white" />
                                     </div>
-                                    <Button variant="ghost" onClick={() => setShowStrategyModal(false)}>
+                                    <div>
+                                        <h2 className="text-xl font-semibold">Generar Mes con IA</h2>
+                                        <p className="text-sm text-muted-foreground">Content Wizard creará todo el contenido</p>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => setShowGenerateModal(false)} disabled={generating}>
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                {error && (
+                                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
+                                        {error}
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Mes</label>
+                                        <select
+                                            value={generateForm.month}
+                                            onChange={(e) => setGenerateForm({ ...generateForm, month: Number(e.target.value) })}
+                                            className="w-full px-4 py-2 bg-secondary border border-border rounded-lg"
+                                            disabled={generating}
+                                        >
+                                            {MONTH_NAMES.slice(1).map((name, i) => (
+                                                <option key={i + 1} value={i + 1}>{name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Año</label>
+                                        <select
+                                            value={generateForm.year}
+                                            onChange={(e) => setGenerateForm({ ...generateForm, year: Number(e.target.value) })}
+                                            className="w-full px-4 py-2 bg-secondary border border-border rounded-lg"
+                                            disabled={generating}
+                                        >
+                                            <option value={2025}>2025</option>
+                                            <option value={2026}>2026</option>
+                                            <option value={2027}>2027</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                                    <h4 className="font-medium mb-2">Lo que se generará:</h4>
+                                    <ul className="text-sm text-muted-foreground space-y-1">
+                                        <li>• Estrategia mensual con pilares de contenido</li>
+                                        <li>• {piecesPerMonth > 0 ? `~${piecesPerMonth}` : 'Varias'} piezas de contenido (posts, carruseles, reels, stories)</li>
+                                        <li>• Hooks, captions, CTAs y hashtags para cada pieza</li>
+                                        <li>• Conceptos visuales para el diseñador</li>
+                                    </ul>
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setShowGenerateModal(false)}
+                                        className="flex-1"
+                                        disabled={generating}
+                                    >
                                         Cancelar
                                     </Button>
+                                    <Button
+                                        onClick={handleCreateMonth}
+                                        disabled={generating}
+                                        className="flex-1"
+                                    >
+                                        {generating ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Generando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Siguiente: Estrategia
+                                                <ChevronRight className="w-4 h-4 ml-2" />
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
 
-                                <MonthlyStrategyPlanner
-                                    monthId={createdMonthId}
-                                    monthName={`${MONTH_NAMES[generateForm.month]} ${generateForm.year}`}
-                                    onComplete={handleStrategyComplete}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Full Screen Loading Overlay when generating */}
-                    {generating && !showGenerateModal && !showStrategyModal && (
-                        <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-                            <div className="w-full max-w-md p-8">
-                                <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 mx-auto animate-pulse">
-                                    <Sparkles className="w-10 h-10 text-primary" />
-                                </div>
-                                <h2 className="text-2xl font-bold text-center mb-2">Content Wizard trabajando...</h2>
-
-                                <div className="w-full bg-secondary rounded-full h-3 mb-3 overflow-hidden">
-                                    <div
-                                        className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
-                                        style={{ width: `${genProgress}%` }}
-                                    />
-                                </div>
-
-                                <div className="flex justify-between text-sm text-muted-foreground mb-4">
-                                    <span>{genStatus}</span>
-                                    <span className="font-medium">{genProgress}%</span>
-                                </div>
-
-                                {genPieceCount.total > 0 && (
+                                {generating && (
                                     <div className="text-center text-sm text-muted-foreground">
-                                        {genPieceCount.done} de {genPieceCount.total} piezas generadas
+                                        Creando borrador...
                                     </div>
                                 )}
                             </div>
                         </div>
-                    )}
+                    </div>
+                )}
 
-                </>
-            )}
-
-            {/* Plan Selection Modal */}
-            {showPlanModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-background border border-border rounded-2xl w-full max-w-2xl shadow-xl">
-                        <div className="flex items-center justify-between p-6 border-b border-border">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                                    <Package className="w-5 h-5 text-white" />
+                {/* Strategy Planner Modal */}
+                {showStrategyModal && createdMonthId && (
+                    <div className="fixed inset-0 bg-background z-50 p-4 overflow-y-auto">
+                        <div className="max-w-4xl mx-auto pt-8">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                                        <Target className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold">Definir Estrategia Mensual</h2>
+                                        <p className="text-muted-foreground">Antes de generar, define el rumbo del mes.</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-xl font-semibold">Seleccionar Plan</h2>
-                                    <p className="text-sm text-muted-foreground">Define cuántas piezas se generarán por mes</p>
-                                </div>
+                                <Button variant="ghost" onClick={() => setShowStrategyModal(false)}>
+                                    Cancelar
+                                </Button>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => setShowPlanModal(false)} disabled={savingPlan}>
-                                <X className="w-4 h-4" />
-                            </Button>
+
+                            <MonthlyStrategyPlanner
+                                monthId={createdMonthId}
+                                monthName={`${MONTH_NAMES[generateForm.month]} ${generateForm.year}`}
+                                onComplete={handleStrategyComplete}
+                            />
                         </div>
-                        <div className="p-6">
-                            <div className="grid grid-cols-3 gap-4">
-                                {plans.map((plan) => (
-                                    <div
-                                        key={plan.id}
-                                        onClick={() => !savingPlan && handleAssignPlan(plan.id)}
-                                        className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${client.plan?.id === plan.id
-                                            ? 'border-primary bg-primary/5'
-                                            : 'border-border hover:border-primary/50'
-                                            }`}
-                                    >
-                                        {client.plan?.id === plan.id && (
-                                            <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                                                <Check className="w-3 h-3 text-white" />
-                                            </div>
-                                        )}
-                                        <h3 className={`text-lg font-bold mb-2 ${plan.name === 'Pro' ? 'text-amber-500' :
-                                            plan.name === 'Growth' ? 'text-primary' : 'text-foreground'
-                                            }`}>
-                                            {plan.name}
-                                        </h3>
-                                        <div className="text-3xl font-bold mb-3">
-                                            {plan.totalPieces || (plan.postsPerMonth + plan.carouselsPerMonth + plan.reelsPerMonth + plan.storiesPerMonth)}
-                                            <span className="text-sm font-normal text-muted-foreground ml-1">piezas/mes</span>
+                    </div>
+                )}
+
+                {/* Full Screen Loading Overlay when generating */}
+                {generating && !showGenerateModal && !showStrategyModal && (
+                    <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                        <div className="w-full max-w-md p-8">
+                            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 mx-auto animate-pulse">
+                                <Sparkles className="w-10 h-10 text-primary" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-center mb-2">Content Wizard trabajando...</h2>
+
+                            <div className="w-full bg-secondary rounded-full h-3 mb-3 overflow-hidden">
+                                <div
+                                    className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
+                                    style={{ width: `${genProgress}%` }}
+                                />
+                            </div>
+
+                            <div className="flex justify-between text-sm text-muted-foreground mb-4">
+                                <span>{genStatus}</span>
+                                <span className="font-medium">{genProgress}%</span>
+                            </div>
+
+                            {genPieceCount.total > 0 && (
+                                <div className="text-center text-sm text-muted-foreground">
+                                    {genPieceCount.done} de {genPieceCount.total} piezas generadas
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+            </>
+        )}
+
+        {/* Plan Selection Modal */}
+        {showPlanModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-background border border-border rounded-2xl w-full max-w-2xl shadow-xl">
+                    <div className="flex items-center justify-between p-6 border-b border-border">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                                <Package className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-semibold">Seleccionar Plan</h2>
+                                <p className="text-sm text-muted-foreground">Define cuántas piezas se generarán por mes</p>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => setShowPlanModal(false)} disabled={savingPlan}>
+                            <X className="w-4 h-4" />
+                        </Button>
+                    </div>
+                    <div className="p-6">
+                        <div className="grid grid-cols-3 gap-4">
+                            {plans.map((plan) => (
+                                <div
+                                    key={plan.id}
+                                    onClick={() => !savingPlan && handleAssignPlan(plan.id)}
+                                    className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${client.plan?.id === plan.id
+                                        ? 'border-primary bg-primary/5'
+                                        : 'border-border hover:border-primary/50'
+                                        }`}
+                                >
+                                    {client.plan?.id === plan.id && (
+                                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                                            <Check className="w-3 h-3 text-white" />
                                         </div>
-                                        <div className="space-y-1 text-sm text-muted-foreground">
-                                            <div className="flex justify-between">
-                                                <span>Posts</span>
-                                                <span className="font-medium text-foreground">{plan.postsPerMonth}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Carruseles</span>
-                                                <span className="font-medium text-foreground">{plan.carouselsPerMonth}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Reels</span>
-                                                <span className="font-medium text-foreground">{plan.reelsPerMonth}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Stories</span>
-                                                <span className="font-medium text-foreground">{plan.storiesPerMonth}</span>
-                                            </div>
+                                    )}
+                                    <h3 className={`text-lg font-bold mb-2 ${plan.name === 'Pro' ? 'text-amber-500' :
+                                        plan.name === 'Growth' ? 'text-primary' : 'text-foreground'
+                                        }`}>
+                                        {plan.name}
+                                    </h3>
+                                    <div className="text-3xl font-bold mb-3">
+                                        {plan.totalPieces || (plan.postsPerMonth + plan.carouselsPerMonth + plan.reelsPerMonth + plan.storiesPerMonth)}
+                                        <span className="text-sm font-normal text-muted-foreground ml-1">piezas/mes</span>
+                                    </div>
+                                    <div className="space-y-1 text-sm text-muted-foreground">
+                                        <div className="flex justify-between">
+                                            <span>Posts</span>
+                                            <span className="font-medium text-foreground">{plan.postsPerMonth}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Carruseles</span>
+                                            <span className="font-medium text-foreground">{plan.carouselsPerMonth}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Reels</span>
+                                            <span className="font-medium text-foreground">{plan.reelsPerMonth}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Stories</span>
+                                            <span className="font-medium text-foreground">{plan.storiesPerMonth}</span>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                            {savingPlan && (
-                                <div className="mt-4 text-center">
-                                    <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
                                 </div>
-                            )}
+                            ))}
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Full Screen Generation Overlay */}
-            {generating && !showGenerateModal && !showStrategyModal && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
-                    <div className="w-full max-w-md bg-card border border-border rounded-xl shadow-2xl p-8 text-center space-y-6 animate-in zoom-in-95 fade-in duration-300">
-                        <div className="relative w-20 h-20 mx-auto">
-                            <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
-                            <div
-                                className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"
-                                style={{ animationDuration: '2s' }}
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center font-bold text-xl">
-                                {genProgress}%
+                        {savingPlan && (
+                            <div className="mt-4 text-center">
+                                <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
                             </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-xl font-bold mb-2">Generando Contenido</h3>
-                            <p className="text-muted-foreground animate-pulse">
-                                {genStatus || 'Iniciando...'}
-                            </p>
-                            {genPieceCount.total > 0 && (
-                                <p className="text-sm text-muted-foreground mt-2">
-                                    Pieza {genPieceCount.done} de {genPieceCount.total}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                            <div
-                                className="bg-primary h-full transition-all duration-500 ease-out"
-                                style={{ width: `${genProgress}%` }}
-                            />
-                        </div>
-
-                        <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                            Esto puede tomar unos momentos. Por favor no cierres la pestaña.
-                        </p>
+                        )}
                     </div>
                 </div>
-            )}
-        </div>
-    )
+            </div>
+        )}
+
+        {/* Full Screen Generation Overlay */}
+        {generating && !showGenerateModal && !showStrategyModal && (
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-md bg-card border border-border rounded-xl shadow-2xl p-8 text-center space-y-6 animate-in zoom-in-95 fade-in duration-300">
+                    <div className="relative w-20 h-20 mx-auto">
+                        <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+                        <div
+                            className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"
+                            style={{ animationDuration: '2s' }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center font-bold text-xl">
+                            {genProgress}%
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 className="text-xl font-bold mb-2">Generando Contenido</h3>
+                        <p className="text-muted-foreground animate-pulse">
+                            {genStatus || 'Iniciando...'}
+                        </p>
+                        {genPieceCount.total > 0 && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                                Pieza {genPieceCount.done} de {genPieceCount.total}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                        <div
+                            className="bg-primary h-full transition-all duration-500 ease-out"
+                            style={{ width: `${genProgress}%` }}
+                        />
+                    </div>
+
+                    <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                        Esto puede tomar unos momentos. Por favor no cierres la pestaña.
+                    </p>
+                </div>
+            </div>
+        )}
+    </div>
+)
 }
