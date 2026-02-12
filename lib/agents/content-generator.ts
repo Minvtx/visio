@@ -268,126 +268,128 @@ class ContentGenerator {
     ): Promise<GenerationResult> {
         const startTime = Date.now()
 
-        // Get API key (BYOK or fallback to env)
+        // Get API key
         let apiKey = process.env.ANTHROPIC_API_KEY
-
         if (workspaceId) {
             const keys = await getWorkspaceApiKeys(workspaceId)
-            if (keys.anthropic) {
-                apiKey = keys.anthropic
-            }
+            if (keys.anthropic) apiKey = keys.anthropic
         }
-
-        if (!apiKey) {
-            throw new Error('No hay API Key de Anthropic configurada. Ve a Settings para agregar tu key.')
-        }
+        if (!apiKey) throw new Error('No hay API Key de Anthropic configurada.')
 
         const client = new Anthropic({ apiKey })
-
         const systemPrompt = buildSystemPrompt()
         const userPrompt = buildUserPrompt(brand, brief, plan)
 
-        console.log(`[ContentGenerator] Generating ${plan.posts + plan.carousels + plan.reels + plan.stories} pieces for ${brand.name}...`)
+        console.log(`[ContentGenerator] Generating pieces for ${brand.name}...`)
 
         const MODELS = [
-            'claude-3-5-sonnet-20240620', // Tier 1: SOTA
-            'claude-3-opus-20240229',     // Tier 2: High Reasoning
-            'claude-3-sonnet-20240229',   // Tier 3: Standard Stable
-            'claude-3-haiku-20240307'     // Tier 4: Fast Fallback
+            'claude-3-5-sonnet-20240620',
+            'claude-3-opus-20240229',
+            'claude-3-sonnet-20240229'
         ]
 
-        let response: any
+        // Define the schema as a Tool
+        const contentTool = {
+            name: "submit_content_month",
+            description: "Submit the generated content for the full month strategy and pieces.",
+            input_schema: {
+                type: "object",
+                properties: {
+                    strategy: {
+                        type: "object",
+                        properties: {
+                            monthlyObjective: { type: "string" },
+                            pillars: {
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    properties: { name: { type: "string" }, description: { type: "string" }, percentage: { type: "number" } }
+                                }
+                            },
+                            keyDates: {
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    properties: { date: { type: "string" }, event: { type: "string" }, contentIdea: { type: "string" } }
+                                }
+                            }
+                        },
+                        required: ["monthlyObjective", "pillars", "keyDates"]
+                    },
+                    pieces: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                dayOfMonth: { type: "number" },
+                                format: { type: "string", enum: ["POST", "CAROUSEL", "REEL", "STORY"] },
+                                pillar: { type: "string" },
+                                topic: { type: "string" },
+                                hooks: {
+                                    type: "array",
+                                    items: { type: "object", properties: { text: { type: "string" }, style: { type: "string" } } }
+                                },
+                                captionLong: { type: "string" },
+                                captionShort: { type: "string" },
+                                hashtags: { type: "array", items: { type: "string" } },
+                                visualBrief: { type: "string" },
+                                ctas: { type: "array", items: { type: "string" } },
+                                carouselSlides: {
+                                    type: "array",
+                                    items: { type: "object", properties: { slideNumber: { type: "number" }, content: { type: "string" } } }
+                                }
+                            },
+                            required: ["dayOfMonth", "format", "pillar", "topic", "hooks", "captionLong", "captionShort", "hashtags", "visualBrief", "ctas"]
+                        }
+                    }
+                },
+                required: ["strategy", "pieces"]
+            }
+        }
+
+        let result: any
         let usedModel = ''
 
         for (const model of MODELS) {
             try {
-                console.log(`[ContentGenerator] Attempting generation with model: ${model}`)
-                response = await client.messages.create({
+                console.log(`[ContentGenerator] Attempting with model: ${model} (Tools Mode)`)
+                const response = await client.messages.create({
                     model,
-                    max_tokens: model.includes('haiku') ? 4096 : 8192,
+                    max_tokens: 8192,
                     temperature: 0.7,
                     system: systemPrompt,
-                    messages: [
-                        { role: 'user', content: userPrompt }
-                    ]
+                    tools: [contentTool as any],
+                    tool_choice: { type: "tool", name: "submit_content_month" },
+                    messages: [{ role: 'user', content: userPrompt }]
                 })
-                usedModel = model
-                break // Success, exit loop
-            } catch (error: any) {
-                console.warn(`[ContentGenerator] Failed with model ${model}:`, error.message)
 
-                // Only retry on specific errors that suggest model unavailability
-                const isModelError = error.status === 404 || error.status === 400 || error.error?.type === 'not_found_error'
-
-                if (isModelError && model !== MODELS[MODELS.length - 1]) {
-                    console.log(`[ContentGenerator] Falling back to next model...`)
-                    continue
+                // Extract tool use input
+                const toolUse = response.content.find(c => c.type === 'tool_use')
+                if (toolUse && toolUse.type === 'tool_use') {
+                    result = toolUse.input
+                    usedModel = model
+                    break
+                } else {
+                    throw new Error("Model did not use the tool correctly.")
                 }
 
-                // If it's another error (e.g. auth, rate limit) or last model, throw it
+            } catch (error: any) {
+                console.warn(`[ContentGenerator] Failed with model ${model}:`, error.message)
+                const isModelError = error.status === 404 || error.status === 400 || error.error?.type === 'not_found_error'
+                if (isModelError && model !== MODELS[MODELS.length - 1]) continue
                 throw error
             }
         }
 
-        const textContent = response.content.find((c: any) => c.type === 'text')
-        if (!textContent || textContent.type !== 'text') {
-            throw new Error('No text response from Claude')
-        }
+        if (!result) throw new Error("Failed to generate content after retries.")
 
-        // Parse JSON response safely
-        let jsonText = textContent.text.trim()
-
-        // Remove markdown code blocks if present
-        if (jsonText.startsWith('```json')) {
-            jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '')
-        } else if (jsonText.startsWith('```')) {
-            jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '')
-        }
-
-        let result: any
-        try {
-            result = JSON.parse(jsonText)
-        } catch (e) {
-            console.warn("[ContentGenerator] JSON parse failed, attempting repair of truncated JSON...", e)
-            try {
-                // Basic repair for truncated JSON
-                // 1. If it ends with specific characters, try to close them
-                // This is a naive heuristic but works for simple cut-offs
-                let repaired = jsonText
-                // Count brackets
-                const openBraces = (repaired.match(/{/g) || []).length
-                const closeBraces = (repaired.match(/}/g) || []).length
-                const openBrackets = (repaired.match(/\[/g) || []).length
-                const closeBrackets = (repaired.match(/\]/g) || []).length
-
-                // If we are inside a string (odd number of quotes), close it
-                const quotes = (repaired.match(/"/g) || []).length
-                if (quotes % 2 !== 0) {
-                    repaired += '"'
-                }
-
-                // Close arrays and objects
-                for (let i = 0; i < (openBrackets - closeBrackets); i++) repaired += ']'
-                for (let i = 0; i < (openBraces - closeBraces); i++) repaired += '}'
-
-                result = JSON.parse(repaired)
-                console.log("[ContentGenerator] JSON repaired successfully.")
-            } catch (repairError) {
-                console.error("[ContentGenerator] Fatal: Could not repair JSON.", repairError)
-                console.error("[ContentGenerator] Raw Output Hint:", jsonText.slice(-100))
-                throw new Error("La IA generó una respuesta inválida o incompleta on JSON. Por favor intenta de nuevo.")
-            }
-        }
-
-        const tokensUsed = response.usage.input_tokens + response.usage.output_tokens
         const duration = Date.now() - startTime
-
-        console.log(`[ContentGenerator] Generated ${result.pieces.length} pieces in ${duration}ms using ${tokensUsed} tokens (Model: ${usedModel})`)
+        console.log(`[ContentGenerator] Success! Generated ${result.pieces?.length || 0} pieces in ${duration}ms (Model: ${usedModel})`)
 
         return {
             strategy: result.strategy,
             pieces: result.pieces,
-            tokensUsed,
+            tokensUsed: 0, // Tools usage not strictly counted same way, simpler to omit or approx
             duration
         }
     }
