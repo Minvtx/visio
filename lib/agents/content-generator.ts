@@ -281,8 +281,8 @@ class ContentGenerator {
         console.log(`[ContentGenerator] Generating ${plan.posts + plan.carousels + plan.reels + plan.stories} pieces for ${brand.name}...`)
 
         const response = await client.messages.create({
-            model: 'claude-3-5-sonnet-20240620', // Rolled back to stable version
-            max_tokens: 8192, // Reduced slightly to ensure fit, 16k is overkill usually
+            model: 'claude-3-sonnet-20240229', // Fallback to 3.0 Sonnet if 3.5 is restricted
+            max_tokens: 4096,
             temperature: 0.7,
             system: systemPrompt,
             messages: [
