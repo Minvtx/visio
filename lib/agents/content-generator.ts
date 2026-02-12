@@ -289,17 +289,47 @@ class ContentGenerator {
 
         console.log(`[ContentGenerator] Generating ${plan.posts + plan.carousels + plan.reels + plan.stories} pieces for ${brand.name}...`)
 
-        const response = await client.messages.create({
-            model: 'claude-3-5-sonnet-20240620',
-            max_tokens: 8192,
-            temperature: 0.7,
-            system: systemPrompt,
-            messages: [
-                { role: 'user', content: userPrompt }
-            ]
-        })
+        const MODELS = [
+            'claude-3-5-sonnet-20240620', // Tier 1: SOTA
+            'claude-3-opus-20240229',     // Tier 2: High Reasoning
+            'claude-3-sonnet-20240229',   // Tier 3: Standard Stable
+            'claude-3-haiku-20240307'     // Tier 4: Fast Fallback
+        ]
 
-        const textContent = response.content.find(c => c.type === 'text')
+        let response: any
+        let usedModel = ''
+
+        for (const model of MODELS) {
+            try {
+                console.log(`[ContentGenerator] Attempting generation with model: ${model}`)
+                response = await client.messages.create({
+                    model,
+                    max_tokens: model.includes('haiku') ? 4096 : 8192,
+                    temperature: 0.7,
+                    system: systemPrompt,
+                    messages: [
+                        { role: 'user', content: userPrompt }
+                    ]
+                })
+                usedModel = model
+                break // Success, exit loop
+            } catch (error: any) {
+                console.warn(`[ContentGenerator] Failed with model ${model}:`, error.message)
+
+                // Only retry on specific errors that suggest model unavailability
+                const isModelError = error.status === 404 || error.status === 400 || error.error?.type === 'not_found_error'
+
+                if (isModelError && model !== MODELS[MODELS.length - 1]) {
+                    console.log(`[ContentGenerator] Falling back to next model...`)
+                    continue
+                }
+
+                // If it's another error (e.g. auth, rate limit) or last model, throw it
+                throw error
+            }
+        }
+
+        const textContent = response.content.find((c: any) => c.type === 'text')
         if (!textContent || textContent.type !== 'text') {
             throw new Error('No text response from Claude')
         }
@@ -319,7 +349,7 @@ class ContentGenerator {
         const tokensUsed = response.usage.input_tokens + response.usage.output_tokens
         const duration = Date.now() - startTime
 
-        console.log(`[ContentGenerator] Generated ${result.pieces.length} pieces in ${duration}ms using ${tokensUsed} tokens`)
+        console.log(`[ContentGenerator] Generated ${result.pieces.length} pieces in ${duration}ms using ${tokensUsed} tokens (Model: ${usedModel})`)
 
         return {
             strategy: result.strategy,
