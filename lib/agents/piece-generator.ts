@@ -158,33 +158,23 @@ export async function generateStrategy(
     const monthName = MONTH_NAMES[brief.month - 1]
     const totalPieces = plan.posts + plan.carousels + plan.reels + plan.stories
 
-    const prompt = `Eres un estratega de contenido para redes sociales en español.
+    const prompt = `Eres un estratega de contenido.
+MARCA: ${brand.name}
+MES: ${monthName}
+OBJETIVO: ${brief.primaryObjective}
+PIEZAS: ${totalPieces} (${plan.posts} posts, ${plan.carousels} carruseles, ${plan.reels} reels, ${plan.stories} stories)
 
-MARCA: ${brand.name || 'La Marca'} | INDUSTRIA: ${brand.industry || 'General'}
-SOBRE: ${brand.about || 'Descripción no disponible'}
-MES: ${monthName} ${brief.year}
-OBJETIVO: ${brief.primaryObjective || 'Aumentar engagement'}
-TOTAL PIEZAS: ${totalPieces} (${plan.posts} posts, ${plan.carousels} carruseles, ${plan.reels} reels, ${plan.stories} stories)
+Genera SOLO la distribución de piezas en JSON. No inventes fechas ni pilares complejos, usa genéricos si es necesario.
 
-Genera SOLO la estrategia mensual en este JSON exacto:
+JSON Requerido:
 {
-  "monthlyObjective": "Objetivo claro y medible",
-  "pillars": [
-    {"name": "Pilar 1", "description": "Descripción", "percentage": 40},
-    {"name": "Pilar 2", "description": "Descripción", "percentage": 30},
-    {"name": "Pilar 3", "description": "Descripción", "percentage": 30}
-  ],
-  "keyDates": [
-    {"date": "DD/MM", "event": "Evento", "contentIdea": "Idea"}
-  ],
+  "monthlyObjective": "Objetivo corto",
+  "pillars": [{"name": "Pilar 1", "description": "...", "percentage": 33}, {"name": "Pilar 2", "description": "...", "percentage": 33}, {"name": "Pilar 3", "description": "...", "percentage": 33}],
   "pieceAssignments": [
-    {"dayOfMonth": 1, "format": "POST", "pillar": "Pilar 1"},
-    {"dayOfMonth": 3, "format": "CAROUSEL", "pillar": "Pilar 2"}
+    {"dayOfMonth": 1, "format": "POST", "pillar": "Pilar 1"}
   ]
 }
-
-En pieceAssignments incluye EXACTAMENTE ${totalPieces} items distribuidos en el mes.
-Solo JSON, sin texto adicional.`
+Asegura EXACTAMENTE ${totalPieces} items en pieceAssignments.`;
 
     try {
         const response = await client.messages.create({
