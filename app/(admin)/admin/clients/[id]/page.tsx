@@ -282,14 +282,14 @@ export default function ClientDetailPage() {
             })
 
             if (!stratRes.ok) {
-                let errorMsg = 'Error al generar estrategia'
+                const errorText = await stratRes.text()
+                let errorMsg = `Error ${stratRes.status}: ${stratRes.statusText}`
                 try {
-                    const errData = await stratRes.json()
+                    const errData = JSON.parse(errorText)
                     errorMsg = errData.error || errorMsg
-                } catch (e) {
-                    const text = await stratRes.text()
-                    console.error("Non-JSON error response (Strategy):", stratRes.status, text)
-                    errorMsg = `Error ${stratRes.status}: ${stratRes.statusText} (Posible Timeout)`
+                } catch {
+                    console.error("Non-JSON error response (Strategy):", errorText.slice(0, 200))
+                    if (stratRes.status === 504) errorMsg = "Error: Tiempo de espera agotado (Timeout). Intenta de nuevo."
                 }
                 throw new Error(errorMsg)
             }
