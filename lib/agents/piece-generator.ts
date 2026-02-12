@@ -67,7 +67,7 @@ OBJETIVO: ${req.brief.primaryObjective}
 
 Responde JSON: { "topic": "Título atractivo", "pillar": "${req.pillar}", "format": "${req.format}", "dayOfMonth": ${req.dayOfMonth} }`;
 
-    return await callClaude(prompt, workspaceId, 'claude-3-5-sonnet-latest', 1000);
+    return await callClaude(prompt, workspaceId, 'claude-3-5-sonnet-20240620', 1000);
 }
 
 // 2. Generate Details (Copy + Visuals) - (< 8s)
@@ -98,7 +98,7 @@ Genera el contenido completo en JSON:
   "carouselSlides": ${req.format === 'CAROUSEL' ? '[]' : 'null'}
 }`;
 
-    return await callClaude(prompt, workspaceId, 'claude-3-5-sonnet-latest', 2000);
+    return await callClaude(prompt, workspaceId, 'claude-3-5-sonnet-20240620', 2000);
 }
 
 async function callClaude(prompt: string, workspaceId: string | undefined, model: string, maxTokens: number): Promise<any> {
