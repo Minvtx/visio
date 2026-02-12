@@ -282,11 +282,9 @@ class ContentGenerator {
 
         console.log(`[ContentGenerator] Generating pieces for ${brand.name}...`)
 
-        const MODELS = [
-            'claude-3-5-sonnet-20240620',
-            'claude-3-opus-20240229',
-            'claude-3-sonnet-20240229'
-        ]
+        // STRICT MODEL LOCK - NO FALLBACKS
+        const MODEL_ID = 'claude-sonnet-4-20250514'
+        const MAX_TOKENS = 20000
 
         // Define the schema as a Tool
         const contentTool = {
@@ -348,54 +346,50 @@ class ContentGenerator {
         }
 
         let result: any
-        let usedModel = ''
 
-        for (const model of MODELS) {
-            try {
-                console.log(`[ContentGenerator] Attempting with model: ${model} (Tools Mode)`)
+        try {
+            console.log(`[ContentGenerator] Attempting generation with STRICT model: ${MODEL_ID} (Tools Mode)`)
 
-                // Determine appropriate token limit
-                let maxTokens = 8192
-                if (model.includes('sonnet-4')) maxTokens = 20000 // Higher limit for newer model
-                if (model.includes('haiku')) maxTokens = 4096
+            const response = await client.messages.create({
+                model: MODEL_ID,
+                max_tokens: MAX_TOKENS,
+                temperature: 0.7,
+                system: systemPrompt,
+                tools: [contentTool as any],
+                tool_choice: { type: "tool", name: "submit_content_month" },
+                messages: [{ role: 'user', content: userPrompt }]
+            })
 
-                const response = await client.messages.create({
-                    model,
-                    max_tokens: maxTokens,
-                    temperature: 0.7,
-                    system: systemPrompt,
-                    tools: [contentTool as any],
-                    tool_choice: { type: "tool", name: "submit_content_month" },
-                    messages: [{ role: 'user', content: userPrompt }]
-                })
-
-                // Extract tool use input
-                const toolUse = response.content.find(c => c.type === 'tool_use')
-                if (toolUse && toolUse.type === 'tool_use') {
-                    result = toolUse.input
-                    usedModel = model
-                    break
-                } else {
-                    throw new Error("Model did not use the tool correctly.")
-                }
-
-            } catch (error: any) {
-                console.warn(`[ContentGenerator] Failed with model ${model}:`, error.message)
-                const isModelError = error.status === 404 || error.status === 400 || error.error?.type === 'not_found_error'
-                if (isModelError && model !== MODELS[MODELS.length - 1]) continue
-                throw error
+            // Extract tool use input
+            const toolUse = response.content.find(c => c.type === 'tool_use')
+            if (toolUse && toolUse.type === 'tool_use') {
+                result = toolUse.input
+            } else {
+                console.error("[ContentGenerator] Invalid Response Content:", response.content)
+                throw new Error("El modelo no usó la herramienta requerida (Tool Use failed). Intenta de nuevo.")
             }
+
+        } catch (error: any) {
+            console.error(`[ContentGenerator] Fatal Error with ${MODEL_ID}:`, error)
+
+            // Enhance error message for transparency
+            let errorMsg = error.message || "Unknown error"
+            if (error.status === 404) errorMsg = `Model ${MODEL_ID} not found or not accessible by API Key.`
+            if (error.status === 401) errorMsg = "Invalid API Key."
+            if (error.status === 429) errorMsg = "Rate limit exceeded (Too many requests)."
+            if (error.status === 500) errorMsg = "Anthropic Server Error."
+            if (error.status === 529) errorMsg = "Anthropic Overloaded."
+
+            throw new Error(`AI Generation Failed: ${errorMsg}`)
         }
 
-        if (!result) throw new Error("Failed to generate content after retries.")
-
         const duration = Date.now() - startTime
-        console.log(`[ContentGenerator] Success! Generated ${result.pieces?.length || 0} pieces in ${duration}ms (Model: ${usedModel})`)
+        console.log(`[ContentGenerator] Success! Generated ${result.pieces?.length || 0} pieces in ${duration}ms`)
 
         return {
             strategy: result.strategy,
             pieces: result.pieces,
-            tokensUsed: 0, // Tools usage not strictly counted same way, simpler to omit or approx
+            tokensUsed: 0,
             duration
         }
     }
