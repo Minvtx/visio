@@ -109,12 +109,16 @@ export async function GET(
             return NextResponse.json({ success: false, error: `Strategy failed: ${e.message}`, logs })
         }
 
-        // 6. Test Single Piece Generation
-        log('--- Testing Single Piece Generation ---')
+        // 6. Test 2-Step Generation (New Logic)
+        log('--- Testing 2-Step Generation (Concept -> Details) ---')
         let piece: any
         try {
-            log('Calling generateSinglePiece with Haiku (speed/timeout test)...')
-            piece = await generateSinglePiece({
+            // Step A: Concept
+            log('Step A: Generating Concept (Sonnet 2-step)...')
+            // Import dynamically or assume imported
+            const { generatePieceConcept, generatePieceDetails } = require('@/lib/agents/piece-generator');
+
+            const concept = await generatePieceConcept({
                 brand: brandContext as any,
                 brief: monthBrief,
                 format: 'POST',
@@ -122,13 +126,26 @@ export async function GET(
                 dayOfMonth: 1,
                 pieceNumber: 1,
                 totalPieces: 1,
-                model: 'claude-3-haiku-20240307' // Force haiku for diagnostic
-            }, client.workspaceId)
-            log(`Piece generated SUCCESS: ${piece.topic}`)
+            }, client.workspaceId);
+            log(`Concept OK: ${concept.topic}`)
+
+            // Step B: Details
+            log('Step B: Generating Details...')
+            piece = await generatePieceDetails(concept, {
+                brand: brandContext as any,
+                brief: monthBrief,
+                format: 'POST',
+                pillar: 'Educación',
+                dayOfMonth: 1,
+                pieceNumber: 1,
+                totalPieces: 1,
+            }, client.workspaceId);
+            log(`Details OK. Copy length: ${piece.captionLong?.length}`)
+
         } catch (e: any) {
-            log(`Piece generation FAILED: ${e.message}`)
+            log(`Generation FAILED: ${e.message}`)
             log(`Full Error: ${JSON.stringify(e)}`)
-            return NextResponse.json({ success: false, error: `Piece generation failed: ${e.message}`, logs })
+            return NextResponse.json({ success: false, error: `Generation failed: ${e.message}`, logs })
         }
 
         // 7. Test DB Save
@@ -140,12 +157,12 @@ export async function GET(
                     type: piece.format as any,
                     title: piece.topic || 'Test Piece',
                     pillar: piece.pillar || 'Test',
-                    copy: {
+                    copy: JSON.stringify({
                         hooks: piece.hooks || [],
                         captionLong: piece.captionLong || '',
                         captionShort: piece.captionShort || '',
                         ctas: piece.ctas || [],
-                    },
+                    }),
                     hashtags: piece.hashtags || [],
                     visualBrief: piece.visualBrief || '',
                     suggestedDate: new Date(month.year, month.month - 1, 1),
