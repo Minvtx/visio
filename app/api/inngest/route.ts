@@ -6,9 +6,8 @@ export const dynamic = 'force-dynamic';
 
 // This endpoint is called by Inngest's cloud to execute background functions.
 // Inngest sends HTTP requests to this route, bypassing Vercel's 10s timeout.
-// Priorizamos la key manual si las automáticas fallan
+// Simplificación final: Dejamos que Inngest maneje las llaves automáticamente
 export const { GET, POST, PUT } = serve({
     client: inngest,
     functions: [generateMonthContent],
-    signingKey: process.env.INNGEST_SIGNING_KEY_MANUAL || process.env.INNGEST_SIGNING_KEY,
 });
