@@ -1,6 +1,6 @@
 import { inngest } from "./client";
 import { prisma } from "@/lib/prisma";
-import { generateStrategy, generateSinglePiece } from "@/lib/agents/piece-generator";
+import { generateStrategy, generatePieceConcept, generatePieceDetails } from "@/lib/agents/piece-generator";
 import type { BrandContext, MonthBrief } from "@/lib/agents/content-generator";
 
 /**
@@ -103,16 +103,13 @@ export const generateMonthContent = inngest.createFunction(
         }
 
         // Step 3-N: Generate each piece individually (~5s each)
-        // NOTE: Each step.run() is a SEPARATE HTTP request.
-        // Local variables like successCount DO NOT persist between steps.
-        // That's why we count from the DB at the end.
         for (let i = 0; i < assignments.length; i++) {
             const assignment = assignments[i];
 
-            await step.run(`generate-piece-${i}`, async () => {
-                console.log(`[Inngest] Generating piece ${i + 1}/${assignments.length} - ${assignment.format} (${assignment.pillar}) day ${assignment.dayOfMonth}`);
-
-                const piece = await generateSinglePiece({
+            // 1. Generate Concept (Title & Idea) - Fast (< 5s)
+            const concept = await step.run(`generate-concept-${i}`, async () => {
+                console.log(`[Inngest] Generating concept ${i + 1}/${assignments.length}...`);
+                return await generatePieceConcept({
                     brand: brandContext,
                     brief: monthBrief,
                     format: assignment.format,
@@ -121,8 +118,21 @@ export const generateMonthContent = inngest.createFunction(
                     pieceNumber: i + 1,
                     totalPieces: assignments.length,
                 }, client.workspaceId);
+            });
 
-                console.log(`[Inngest] Piece ${i + 1} generated: "${piece.topic}"`);
+            // 2. Generate Details (Copy, Hooks, Visuals) - Fast (< 8s)
+            await step.run(`generate-details-${i}`, async () => {
+                console.log(`[Inngest] Generating details for "${concept.topic}"...`);
+
+                const piece = await generatePieceDetails(concept, {
+                    brand: brandContext,
+                    brief: monthBrief,
+                    format: assignment.format,
+                    pillar: assignment.pillar,
+                    dayOfMonth: assignment.dayOfMonth,
+                    pieceNumber: i + 1,
+                    totalPieces: assignments.length,
+                }, client.workspaceId);
 
                 // Save piece to DB immediately
                 const saved = await prisma.contentPiece.create({
@@ -149,7 +159,7 @@ export const generateMonthContent = inngest.createFunction(
                 });
 
                 console.log(`[Inngest] Piece ${i + 1} SAVED to DB: ${saved.id}`);
-                return { pieceId: saved.id, title: piece.topic };
+                return { pieceId: saved.id };
             });
         }
 
