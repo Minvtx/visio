@@ -8,8 +8,9 @@ const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-    title: 'Meridian Social Suite',
-    description: 'El centro de tu universo social. Genera contenido con IA en minutos.',
+    title: 'Meridian Social Suite - Tu Universo de Contenido con IA',
+    description: 'Genera meses de contenido estratégico, gestiona múltiples clientes y escala tu agencia de marketing con el poder de la Inteligencia Artificial.',
+    keywords: ['IA para marketing', 'gestión de redes sociales', 'generador de contenido', 'agencia de marketing', 'social media planner', 'automatización'],
 }
 
 export default function RootLayout({

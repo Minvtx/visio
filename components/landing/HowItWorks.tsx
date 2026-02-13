@@ -5,23 +5,23 @@ import { ClipboardList, Zap, Check, Calendar } from "lucide-react"
 
 const steps = [
     {
-        title: "Define Strategy",
-        description: "Input your brand guidelines, tone of voice, and monthly goals.",
+        title: "Define tu Estrategia",
+        description: "Ingresa tus guías de marca, tono de voz y objetivos mensuales.",
         icon: ClipboardList,
     },
     {
-        title: "Click Generate",
-        description: "Watch as our localized AI agents create 30 days of unique content.",
+        title: "Genera en un Click",
+        description: "Mira como nuestros agentes de IA localizados crean 30 días de contenido único.",
         icon: Zap,
     },
     {
-        title: "Review & Refine",
-        description: "Approve posts or request tweaks. The AI learns from your feedback.",
+        title: "Revisa y Refina",
+        description: "Aprueba posts o solicita ajustes. La IA aprende de tu feedback.",
         icon: Check,
     },
     {
-        title: "Schedule or Export",
-        description: "Push directly to your social tools or download assets in one click.",
+        title: "Programa o Exporta",
+        description: "Publica directamente o descarga tus assets en un solo click.",
         icon: Calendar,
     },
 ]
@@ -34,8 +34,8 @@ export function HowItWorks() {
             <div className="max-w-7xl mx-auto px-6 relative z-10">
                 <div className="text-center mb-24">
                     <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                        From briefing to live <br />
-                        <span className="text-meridian-gold">in minutes.</span>
+                        Del briefing al live <br />
+                        <span className="text-meridian-gold">en minutos.</span>
                     </h2>
                 </div>
 

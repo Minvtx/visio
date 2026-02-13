@@ -5,43 +5,43 @@ import { Sparkles, Calendar, Layout, BarChart, Download, Users, Zap } from "luci
 
 const features = [
     {
-        title: "AI Brand Agents",
-        description: "Multiple agents working in parallel to create content that matches your brand voice perfectly.",
+        title: "Agentes de Marca IA",
+        description: "Múltiples agentes trabajando en paralelo para crear contenido que coincide perfectamente con la voz de tu marca.",
         icon: Sparkles,
         className: "md:col-span-2",
         color: "bg-meridian-gold/10 text-meridian-gold",
     },
     {
-        title: "Total Integration",
-        description: "Seamlessly connects with Google Drive, Calendar, and Meet.",
+        title: "Integración Total",
+        description: "Conecta Google Drive, Calendar y Meet sin fricción.",
         icon: Zap,
         className: "md:col-span-1",
         color: "bg-meridian-precision/10 text-meridian-precision",
     },
     {
-        title: "Client View",
-        description: "Share read-only views for seamless approvals and feedback.",
+        title: "Vista de Cliente",
+        description: "Comparte vistas de solo lectura para aprobaciones y feedback sin complicaciones.",
         icon: Users,
         className: "md:col-span-1",
         color: "bg-meridian-deep/10 text-meridian-deep",
     },
     {
-        title: "Month-to-Month Generation",
-        description: "Visualize and plan your entire year with our infinite calendar interface.",
+        title: "Generación Mes a Mes",
+        description: "Visualiza y planifica tu año entero con nuestra interfaz de gestión mensual.",
         icon: Calendar,
         className: "md:col-span-2",
         color: "bg-purple-500/10 text-purple-500",
     },
     {
-        title: "Instant Export",
-        description: "Download everything in one click. Zip, PDF, or direct scheduling.",
+        title: "Exportación Instantánea",
+        description: "Descarga todo en un click. Zip, PDF, o programación directa.",
         icon: Download,
         className: "md:col-span-1",
         color: "bg-emerald-500/10 text-emerald-500",
     },
     {
-        title: "Real-time Analytics",
-        description: "Track performance and adjust strategy on the fly.",
+        title: "Analíticas en Tiempo Real",
+        description: "Rastrea el rendimiento y ajusta la estrategia al vuelo.",
         icon: BarChart,
         className: "md:col-span-1",
         color: "bg-rose-500/10 text-rose-500",
@@ -54,8 +54,8 @@ export function FeaturesBento() {
             <div className="max-w-7xl mx-auto px-6">
                 <div className="text-center mb-20">
                     <h2 className="text-4xl md:text-5xl font-bold text-meridian-deep mb-6">
-                        Your entire social ecosystem. <br />
-                        <span className="text-meridian-gold">One single meridian.</span>
+                        Todo tu ecosistema social. <br />
+                        <span className="text-meridian-gold">Un solo meridiano.</span>
                     </h2>
                 </div>
 

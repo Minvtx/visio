@@ -13,7 +13,7 @@ interface TopBarProps {
 export function TopBar({ sidebarCollapsed = false }: TopBarProps) {
     return (
         <header
-            className="fixed top-0 right-0 z-30 h-16 border-b border-border bg-card/80 backdrop-blur-md transition-all duration-300"
+            className="fixed top-0 right-0 z-30 h-16 border-b border-white/10 bg-background/60 backdrop-blur-xl transition-all duration-300"
             style={{ left: sidebarCollapsed ? '4rem' : '16rem' }}
         >
             <div className="flex h-full items-center justify-between px-6">

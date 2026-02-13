@@ -49,15 +49,15 @@ export function FinalCTA() {
             >
                 <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-meridian-gold border border-meridian-gold/20 backdrop-blur-md">
                     <Sparkles className="w-4 h-4" />
-                    <span>Start your free trial today</span>
+                    <span>Empieza tu prueba gratis hoy</span>
                 </div>
 
                 <h2 className="text-5xl md:text-7xl font-bold text-white mb-8 tracking-tight">
-                    Reach your zenith.
+                    Alcanza tu cenit.
                 </h2>
 
                 <p className="text-xl text-meridian-cream/60 mb-12 max-w-2xl mx-auto">
-                    Join the thousands of modern brands that have automated their social growth with Meridian.
+                    Únete a las miles de marcas modernas que han automatizado su crecimiento social con Meridian.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
@@ -67,14 +67,14 @@ export function FinalCTA() {
                         asChild
                     >
                         <Link href="/register">
-                            Start Now
+                            Empezar Ahora
                             <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
                         </Link>
                     </Button>
                 </div>
 
                 <p className="mt-8 text-sm text-meridian-cream/30">
-                    No credit card required. Cancel anytime.
+                    No requiere tarjeta de crédito. Cancela cuando quieras.
                 </p>
             </motion.div>
         </section>

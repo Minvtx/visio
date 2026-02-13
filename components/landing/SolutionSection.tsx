@@ -38,19 +38,19 @@ export function SolutionSection() {
                             viewport={{ once: true }}
                             className="text-4xl md:text-5xl font-bold text-meridian-deep mb-6"
                         >
-                            One click. <br />
-                            <span className="text-meridian-precision">A full month.</span>
+                            Un solo click. <br />
+                            <span className="text-meridian-precision">Un mes entero.</span>
                         </motion.h2>
                         <p className="text-xl text-meridian-deep/70 mb-8 leading-relaxed">
-                            Your brief becomes strategy. Our AI becomes reality.
-                            Watch how minutes turn into a month&apos;s worth of high-quality content.
+                            Tu briefing se convierte en estrategia. Nuestra IA la hace realidad.
+                            Mira cómo minutos se transforman en un mes de contenido de alta calidad.
                         </p>
 
                         <div className="space-y-6 mb-10">
                             {[
-                                { icon: Sparkles, text: "Intelligent Briefing Agent" },
-                                { icon: Zap, text: "Instant Multi-Format Generation" },
-                                { icon: Check, text: "Centralized Approval Workflow" }
+                                { icon: Sparkles, text: "Agente Inteligente de Briefing" },
+                                { icon: Zap, text: "Generación Multi-Formato Instantánea" },
+                                { icon: Check, text: "Flujo de Aprobación Centralizado" }
                             ].map((item, i) => (
                                 <motion.div
                                     key={i}
@@ -75,7 +75,7 @@ export function SolutionSection() {
                             disabled={isGenerating || generatedPosts.length === 30}
                         >
                             <Sparkles className="w-4 h-4 mr-2" />
-                            {generatedPosts.length === 30 ? "Month Generated!" : isGenerating ? "Generating..." : "Generate Month"}
+                            {generatedPosts.length === 30 ? "Mes Generado!" : isGenerating ? "Generando..." : "Generar Mes"}
                         </Button>
                     </div>
 
@@ -87,8 +87,8 @@ export function SolutionSection() {
                             {/* Header */}
                             <div className="flex items-center justify-between mb-8">
                                 <div>
-                                    <h3 className="font-bold text-meridian-deep">October Content</h3>
-                                    <p className="text-sm text-meridian-deep/50">Strategy: Autumn Launch</p>
+                                    <h3 className="font-bold text-meridian-deep">Contenido Octubre</h3>
+                                    <p className="text-sm text-meridian-deep/50">Estrategia: Lanzamiento de Otoño</p>
                                 </div>
                                 <div className="px-4 py-1 bg-meridian-secondary rounded-full text-xs font-medium text-meridian-deep">
                                     {generatedPosts.length} / 30 Posts

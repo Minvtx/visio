@@ -15,7 +15,7 @@ export function Footer() {
                             <span className="font-display font-bold text-xl text-white">MERIDIAN</span>
                         </Link>
                         <p className="text-meridian-cream/60 max-w-xs">
-                            The center of your social universe. AI-powered content generation for modern brands.
+                            El centro de tu universo social. Generación de contenido con IA para marcas modernas.
                         </p>
                         <div className="flex items-center gap-4">
                             {[Twitter, Linkedin, Instagram, Github].map((Icon, i) => (
@@ -32,9 +32,9 @@ export function Footer() {
 
                     {/* Columns */}
                     {[
-                        { title: "Product", links: ["Features", "Pricing", "Roadmap", "Changelog"] },
-                        { title: "Resources", links: ["Community", "Help Center", "API Docs", "Status"] },
-                        { title: "Company", links: ["About", "Blog", "Careers", "Contact"] },
+                        { title: "Producto", links: ["Características", "Precios", "Roadmap", "Changelog"] },
+                        { title: "Recursos", links: ["Comunidad", "Centro de Ayuda", "Docs API", "Estado"] },
+                        { title: "Compañía", links: ["Sobre Nosotros", "Blog", "Carreras", "Contacto"] },
                     ].map((col) => (
                         <div key={col.title}>
                             <h4 className="font-semibold text-white mb-6">{col.title}</h4>
@@ -55,15 +55,15 @@ export function Footer() {
                 </div>
 
                 <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-meridian-cream/40">
-                    <p>© 2025 Meridian Social Suite. All rights reserved.</p>
+                    <p>© 2025 Meridian Social Suite. Todos los derechos reservados.</p>
                     <div className="flex items-center gap-8">
-                        <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
-                        <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>
+                        <Link href="#" className="hover:text-white transition-colors">Política de Privacidad</Link>
+                        <Link href="#" className="hover:text-white transition-colors">Términos de Servicio</Link>
                     </div>
                 </div>
 
                 <div className="text-center mt-12">
-                    <p className="text-meridian-cream/20 font-mono text-xs tracking-[0.2em] uppercase">Find your meridian</p>
+                    <p className="text-meridian-cream/20 font-mono text-xs tracking-[0.2em] uppercase">Encuentra tu meridiano</p>
                 </div>
             </div>
         </footer>

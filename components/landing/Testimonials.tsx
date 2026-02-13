@@ -6,19 +6,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 const testimonials = [
     {
-        quote: "We went from 40 hours a month on content to just 4. Meridian gave us our strategy time back.",
-        author: "Ana Garcia",
+        quote: "Pasamos de 40 horas al mes en contenido a solo 4. Meridian nos devolvió nuestro tiempo de estrategia.",
+        author: "Ana García",
         role: "CMO @ TechCorp",
         avatar: "/avatars/ana.jpg"
     },
     {
-        quote: "The brand voice accuracy is scary good. It sounds exactly like our senior copywriter.",
+        quote: "La precisión de la voz de marca es increíble. Suena exactamente como nuestro copywriter senior.",
         author: "David Chen",
-        role: "Head of Growth @ StartupX",
+        role: "Jefe de Crecimiento @ StartupX",
         avatar: "/avatars/david.jpg"
     },
     {
-        quote: "Finally, a tool that understands the difference between a LinkedIn post and an Instagram caption.",
+        quote: "Finalmente, una herramienta que entiende la diferencia entre un post de LinkedIn y un caption de Instagram.",
         author: "Sarah Jones",
         role: "Social Media Manager",
         avatar: "/avatars/sarah.jpg"
@@ -31,7 +31,7 @@ export function Testimonials() {
             <div className="max-w-7xl mx-auto px-6">
                 <div className="text-center mb-20">
                     <h2 className="text-4xl md:text-5xl font-bold text-meridian-deep mb-6">
-                        Teams that found their meridian.
+                        Equipos que encontraron su meridiano.
                     </h2>
                 </div>
 

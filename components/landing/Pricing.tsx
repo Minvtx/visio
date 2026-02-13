@@ -10,39 +10,39 @@ const plans = [
     {
         name: "Starter",
         price: { monthly: 49, yearly: 39 },
-        description: "Perfect for solopreneurs and small creators.",
+        description: "Perfecto para solopreneurs y creadores.",
         features: [
-            "5 AI Brand Agents",
-            "100 AI Generated Posts/mo",
-            "1 Workspace",
-            "Basic Analytics",
+            "5 Agentes de Marca IA",
+            "100 Posts Generados/mes",
+            "1 Espacio de Trabajo",
+            "Analíticas Básicas",
         ]
     },
     {
         name: "Professional",
         price: { monthly: 99, yearly: 79 },
-        description: "For growing agencies and marketing teams.",
+        description: "Para agencias en crecimiento y equipos de marketing.",
         popular: true,
         features: [
-            "Unlimited AI Brand Agents",
-            "Unlimited AI Generated Posts",
-            "5 Workspaces",
-            "Advanced Analytics",
-            "Client Approval Portals",
-            "Priority Support",
+            "Agentes de Marca Ilimitados",
+            "Generación Ilimitada",
+            "5 Espacios de Trabajo",
+            "Analíticas Avanzadas",
+            "Portal de Aprobación de Clientes",
+            "Soporte Prioritario",
         ]
     },
     {
         name: "Enterprise",
         price: { monthly: 299, yearly: 249 },
-        description: "Custom solutions for large organizations.",
+        description: "Soluciones a medida para grandes organizaciones.",
         features: [
-            "Everything in Professional",
-            "Custom AI Model Training",
-            "SSO & Advanced Security",
-            "Dedicated Success Manager",
-            "SLA Guarantees",
-            "API Access",
+            "Todo en Professional",
+            "Entrenamiento de Modelos IA Personalizados",
+            "SSO y Seguridad Avanzada",
+            "Success Manager Dedicado",
+            "Garantías SLA",
+            "Acceso a API",
         ]
     }
 ]
@@ -55,11 +55,11 @@ export function Pricing() {
             <div className="max-w-7xl mx-auto px-6">
                 <div className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold text-meridian-deep mb-6">
-                        Find your plan.
+                        Encuentra tu plan.
                     </h2>
 
                     <div className="flex items-center justify-center gap-4 mt-8">
-                        <span className={`text-sm font-medium ${!isYearly ? 'text-meridian-deep' : 'text-meridian-deep/50'}`}>Monthly</span>
+                        <span className={`text-sm font-medium ${!isYearly ? 'text-meridian-deep' : 'text-meridian-deep/50'}`}>Mensual</span>
                         <button
                             onClick={() => setIsYearly(!isYearly)}
                             className="w-14 h-7 bg-meridian-deep rounded-full relative p-1 transition-colors hover:bg-meridian-deep/90"
@@ -71,7 +71,7 @@ export function Pricing() {
                             />
                         </button>
                         <span className={`text-sm font-medium ${isYearly ? 'text-meridian-deep' : 'text-meridian-deep/50'}`}>
-                            Yearly <span className="text-meridian-precision text-xs ml-1 font-bold">-20%</span>
+                            Anual <span className="text-meridian-precision text-xs ml-1 font-bold">-20%</span>
                         </span>
                     </div>
                 </div>
@@ -89,7 +89,7 @@ export function Pricing() {
                             {plan.popular && (
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-meridian-gold text-meridian-deep text-xs font-bold px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">
                                     <Sparkles className="w-3 h-3" />
-                                    MOST POPULAR
+                                    MÁS POPULAR
                                 </div>
                             )}
 
@@ -98,7 +98,7 @@ export function Pricing() {
 
                             <div className="mb-8">
                                 <span className="text-4xl font-bold text-meridian-deep">${isYearly ? plan.price.yearly : plan.price.monthly}</span>
-                                <span className="text-meridian-deep/40">/month</span>
+                                <span className="text-meridian-deep/40">/mes</span>
                             </div>
 
                             <Button
@@ -106,7 +106,7 @@ export function Pricing() {
                                 asChild
                             >
                                 <Link href="/register">
-                                    Get Started
+                                    Empezar Ahora
                                 </Link>
                             </Button>
 

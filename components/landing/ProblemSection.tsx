@@ -6,18 +6,18 @@ import { Clock, UserX, Mail } from "lucide-react"
 const problems = [
     {
         icon: Clock,
-        title: "Endless Briefing",
-        description: "Weeks spent coordinating what to post and when. The strategy document that never ends."
+        title: "Briefing Interminable",
+        description: "Semanas coordinando qué postear y cuándo. El documento de estrategia que nunca termina."
     },
     {
         icon: UserX,
-        title: "Manual Creation",
-        description: "Designers and copywriters blocked. Creative energy wasted on repetitive execution."
+        title: "Creación Manual",
+        description: "Diseñadores y copywriters bloqueados. Energía creativa desperdiciada en ejecución repetitiva."
     },
     {
         icon: Mail,
-        title: "Eternal Approvals",
-        description: "30 email threads for 30 posts. Context switching that kills productivity."
+        title: "Aprobaciones Eternas",
+        description: "Hilo de 30 emails para 3 posts. Cambios de contexto que matan la productividad."
     }
 ]
 
@@ -38,8 +38,8 @@ export function ProblemSection() {
                         viewport={{ once: true }}
                         className="text-4xl md:text-5xl font-bold text-meridian-deep mb-6"
                     >
-                        30 days. 30 posts. <br />
-                        <span className="text-meridian-deep/50">Infinite lost hours.</span>
+                        30 días. 30 posts. <br />
+                        <span className="text-meridian-deep/50">Horas infinitas perdidas.</span>
                     </motion.h2>
                 </div>
 

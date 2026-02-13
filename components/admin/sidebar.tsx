@@ -33,7 +33,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     return (
         <aside
             className={cn(
-                'fixed left-0 top-0 z-40 h-screen border-r border-border bg-card transition-all duration-300',
+                'fixed left-0 top-0 z-40 h-screen border-r border-white/10 bg-background/60 backdrop-blur-xl transition-all duration-300',
                 collapsed ? 'w-16' : 'w-64'
             )}
         >

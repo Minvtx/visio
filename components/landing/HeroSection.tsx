@@ -33,7 +33,7 @@ export function HeroSection() {
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-8 hover:bg-white/10 transition-colors cursor-default"
                 >
                     <Sparkles className="w-4 h-4 text-meridian-gold" />
-                    <span className="text-sm font-medium text-meridian-cream/80">AI-First Social Management</span>
+                    <span className="text-sm font-medium text-meridian-cream/80">Gestión Social AI-First</span>
                 </motion.div>
 
                 {/* Headline */}
@@ -43,9 +43,9 @@ export function HeroSection() {
                     transition={{ duration: 0.8, delay: 0.2 }}
                     className="text-6xl md:text-8xl font-display font-bold mb-6 tracking-tight"
                 >
-                    <span className="block text-white mb-2">The center of your</span>
+                    <span className="block text-white mb-2">El centro de tu</span>
                     <span className="bg-gradient-to-r from-meridian-gold via-meridian-precision to-meridian-gold bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
-                        social universe
+                        universo social
                     </span>
                 </motion.h1>
 
@@ -56,9 +56,9 @@ export function HeroSection() {
                     transition={{ duration: 0.8, delay: 0.4 }}
                     className="text-xl md:text-2xl text-meridian-cream/60 mb-10 max-w-3xl mx-auto leading-relaxed"
                 >
-                    One click. A full month of content.
+                    Un click. Un mes completo de contenido.
                     <br className="hidden md:block" />
-                    Generated with precision by AI agents that understand your brand.
+                    Generado con precisión por agentes de IA que realmente entienden tu marca.
                 </motion.p>
 
                 {/* CTAs */}
@@ -73,7 +73,7 @@ export function HeroSection() {
                             size="lg"
                             className="h-14 px-8 text-lg bg-meridian-gold hover:bg-meridian-gold/90 text-meridian-deep font-bold rounded-full shadow-[0_0_20px_-5px_rgba(245,166,35,0.4)] hover:shadow-[0_0_30px_-5px_rgba(245,166,35,0.6)] transition-all hover:scale-105"
                         >
-                            Start Free Trial
+                            Empezar Prueba Gratis
                             <ArrowRight className="ml-2 w-5 h-5" />
                         </Button>
                     </Link>
@@ -86,7 +86,7 @@ export function HeroSection() {
                         <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center mr-3 group-hover:bg-meridian-precision group-hover:text-white transition-colors">
                             <Play className="w-4 h-4 fill-current pl-0.5" />
                         </div>
-                        Watch Demo
+                        Ver Demo
                     </Button>
                 </motion.div>
 

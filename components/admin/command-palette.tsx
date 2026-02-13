@@ -211,7 +211,7 @@ export function CommandPalette() {
 
             {/* Command Palette */}
             <div className="fixed inset-x-0 top-[20%] z-50 mx-auto w-full max-w-xl">
-                <div className="bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+                <div className="bg-background/80 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden">
                     {/* Search Input */}
                     <div className="flex items-center px-4 border-b border-border">
                         <Search className="w-5 h-5 text-muted-foreground" />

@@ -45,7 +45,7 @@ export function Navbar() {
 
                     {/* Desktop Menu */}
                     <nav className="hidden md:flex items-center gap-8">
-                        {["Features", "How it Works", "Pricing", "Resources"].map((item) => (
+                        {["Características", "Cómo Funciona", "Precios", "Recursos"].map((item) => (
                             <Link
                                 key={item}
                                 href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
@@ -60,14 +60,14 @@ export function Navbar() {
                     {/* CTA */}
                     <div className="hidden md:flex items-center gap-4">
                         <Link href="/login" className="text-sm font-medium text-white hover:text-meridian-gold transition-colors">
-                            Log in
+                            Iniciar Sesión
                         </Link>
                         <Button
                             asChild
                             className="bg-meridian-gold hover:bg-meridian-gold/90 text-meridian-deep font-semibold rounded-full px-6 transition-all hover:scale-105 hover:shadow-lg hover:shadow-meridian-gold/20"
                         >
                             <Link href="/register">
-                                Get Started
+                                Empezar
                             </Link>
                         </Button>
                     </div>
@@ -90,7 +90,7 @@ export function Navbar() {
                     exit={{ opacity: 0, y: -20 }}
                     className="absolute top-full left-0 right-0 bg-meridian-deep border-b border-white/10 p-6 md:hidden flex flex-col gap-4"
                 >
-                    {["Features", "How it Works", "Pricing", "Resources"].map((item) => (
+                    {["Características", "Cómo Funciona", "Precios", "Recursos"].map((item) => (
                         <Link
                             key={item}
                             href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
@@ -101,9 +101,9 @@ export function Navbar() {
                         </Link>
                     ))}
                     <div className="h-px bg-white/10 my-2" />
-                    <Link href="/login" className="text-lg text-white py-2">Log in</Link>
+                    <Link href="/login" className="text-lg text-white py-2">Iniciar Sesión</Link>
                     <Link href="/register" className="w-full bg-meridian-gold text-meridian-deep font-bold py-3 text-center rounded-lg">
-                        Get Started
+                        Empezar
                     </Link>
                 </motion.div>
             )}

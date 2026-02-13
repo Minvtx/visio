@@ -20,7 +20,7 @@ export function SocialProof() {
         <section className="py-10 border-y border-white/5 bg-meridian-deep/50 backdrop-blur-sm relative overflow-hidden">
             <div className="max-w-7xl mx-auto px-6 mb-8 text-center">
                 <p className="text-sm font-medium text-meridian-cream/40 uppercase tracking-widest">
-                    Trusted by modern marketing teams at
+                    Marcas modernas que confían en Meridian
                 </p>
             </div>
 
