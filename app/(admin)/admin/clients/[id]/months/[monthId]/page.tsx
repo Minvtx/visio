@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AssetUploader } from '@/components/assets/asset-uploader'
@@ -232,6 +233,11 @@ export default function ContentMonthPage() {
                 if (refreshed && refreshed.status !== 'GENERATING') {
                     setGenerating(false);
                     setGenProgress(100);
+                    if (refreshed.status === 'DRAFT' || refreshed.status === 'APPROVED') {
+                        // Success toast
+                        const audio = new Audio('/success.mp3').play().catch(() => { }) // Optional sound
+                        alert("✨ ¡Contenido Generado Exitosamente!");
+                    }
                     if (interval) clearInterval(interval);
                 }
             }, 4000); // Poll every 4s for better responsiveness
@@ -340,7 +346,7 @@ export default function ContentMonthPage() {
     // ─── REGENERATE (Background Job via Inngest) ───
     const handleRegenerate = async (e?: React.MouseEvent) => {
         if (e) e.preventDefault()
-        if (generating) return
+        if (generating || monthData?.status === 'GENERATING') return
 
         if (!confirm('¿Estás seguro? Esto borrará las piezas actuales y generará nuevas en segundo plano.')) return
 
@@ -594,14 +600,14 @@ export default function ContentMonthPage() {
                     <Button
                         variant="outline"
                         onClick={() => handleRegenerate()}
-                        disabled={generating}
+                        disabled={generating || monthData?.status === 'GENERATING'}
                     >
-                        {generating ? (
+                        {(generating || monthData?.status === 'GENERATING') ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         ) : (
                             <RotateCcw className="w-4 h-4 mr-2" />
                         )}
-                        Regenerar Todo
+                        {generating ? 'Generando...' : 'Regenerar Todo'}
                     </Button>
                     <Button
                         variant="outline"
@@ -822,46 +828,30 @@ export default function ContentMonthPage() {
                 </div>
             )}
 
-            {/* Generation Overlay */}
-            {generating && (
-                <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-                    <div className="w-full max-w-md p-8">
-                        <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 mx-auto animate-pulse">
-                            <Sparkles className="w-10 h-10 text-primary" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-center mb-2">Content Wizard trabajando...</h2>
-
-                        {/* Progress bar */}
-                        <div className="w-full bg-secondary rounded-full h-3 mb-3 overflow-hidden">
-                            <div
-                                className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
-                                style={{ width: `${genProgress}%` }}
-                            />
-                        </div>
-
-                        <div className="flex justify-between text-sm text-muted-foreground mb-4">
-                            <span>{genStatus}</span>
-                            <span className="font-medium">{genProgress}%</span>
-                        </div>
-
-                        {genPieceCount.total > 0 && (
-                            <div className="text-center text-sm text-muted-foreground mb-4">
-                                {genPieceCount.done} de {genPieceCount.total} piezas generadas
+            {/* Generation Banner (Non-blocking) */}
+            <AnimatePresence>
+                {generating && (
+                    <motion.div
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-6 right-6 z-50 pointer-events-none"
+                    >
+                        <div className="bg-meridian-deep text-white shadow-2xl rounded-xl p-4 flex items-center gap-4 border border-meridian-gold/20 pr-8 min-w-[300px] pointer-events-auto">
+                            <div className="relative">
+                                <div className="w-10 h-10 bg-meridian-gold/20 rounded-lg flex items-center justify-center animate-pulse">
+                                    <Sparkles className="w-5 h-5 text-meridian-gold" />
+                                </div>
+                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-meridian-precision rounded-full animate-bounce" />
                             </div>
-                        )}
-
-                        {(genStatus.startsWith('❌') || genProgress === 100) ? (
-                            <Button className="w-full mt-4 bg-background border border-input hover:bg-accent hover:text-accent-foreground text-foreground" onClick={() => setGenerating(false)}>
-                                Cerrar
-                            </Button>
-                        ) : (
-                            <p className="text-center text-xs text-muted-foreground mt-6">
-                                No cierres esta pestaña. Cada pieza se genera individualmente para evitar timeouts.
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
+                            <div>
+                                <h4 className="font-bold text-sm text-white">Creando Magia...</h4>
+                                <p className="text-xs text-white/60">Nuestros agentes están trabajando.</p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }
