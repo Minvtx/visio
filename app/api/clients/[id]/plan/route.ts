@@ -31,10 +31,16 @@ export async function PATCH(
             return NextResponse.json({ error: 'Plan no encontrado' }, { status: 404 })
         }
 
-        // Update client's plan
+        // Update client's plan and custom limits
         const client = await prisma.client.update({
             where: { id: params.id },
-            data: { planId },
+            data: {
+                planId,
+                customPostsPerMonth: body.customPostsPerMonth,
+                customCarouselsPerMonth: body.customCarouselsPerMonth,
+                customReelsPerMonth: body.customReelsPerMonth,
+                customStoriesPerMonth: body.customStoriesPerMonth,
+            },
             include: {
                 plan: true,
             },

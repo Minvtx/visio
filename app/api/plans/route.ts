@@ -1,95 +1,116 @@
 import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 
-// Default plans configuration
-const DEFAULT_PLANS = [
-    {
-        id: 'plan-base',
-        name: 'Base',
-        postsPerMonth: 8,
-        carouselsPerMonth: 2,
-        reelsPerMonth: 2,
-        storiesPerMonth: 4,
-    },
-    {
-        id: 'plan-growth',
-        name: 'Growth',
-        postsPerMonth: 12,
-        carouselsPerMonth: 4,
-        reelsPerMonth: 4,
-        storiesPerMonth: 8,
-    },
-    {
-        id: 'plan-pro',
-        name: 'Pro',
-        postsPerMonth: 20,
-        carouselsPerMonth: 8,
-        reelsPerMonth: 8,
-        storiesPerMonth: 12,
-    },
-]
+export async function GET(request: Request) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) { // Using email as proxy for auth since we might not have user.id in session yet
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-// GET /api/plans - List all plans
-export async function GET() {
+    // Get user to find workspace
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { workspaceId: true }
+    })
+
+    if (!user?.workspaceId) {
+        return NextResponse.json({ error: 'No workspace found' }, { status: 400 })
+    }
+
     try {
-        let plans = await prisma.plan.findMany({
-            orderBy: { postsPerMonth: 'asc' },
+        // Fetch System Plans (workspaceId is null) AND Custom Plans (workspaceId matches)
+        const plans = await prisma.plan.findMany({
+            where: {
+                OR: [
+                    { workspaceId: null },
+                    { workspaceId: user.workspaceId }
+                ]
+            },
+            orderBy: {
+                createdAt: 'asc'
+            }
         })
 
-        // If no plans exist, create the default ones
-        if (plans.length === 0) {
-            await prisma.plan.createMany({
-                data: DEFAULT_PLANS,
-            })
-            plans = await prisma.plan.findMany({
-                orderBy: { postsPerMonth: 'asc' },
-            })
-        }
-
-        // Add calculated totals
-        const plansWithTotals = plans.map(plan => ({
-            ...plan,
-            totalPieces: plan.postsPerMonth + plan.carouselsPerMonth + plan.reelsPerMonth + plan.storiesPerMonth,
-        }))
-
-        return NextResponse.json(plansWithTotals)
+        return NextResponse.json(plans)
     } catch (error) {
-        console.error('Error listing plans:', error)
-        return NextResponse.json({ error: 'Error al listar planes' }, { status: 500 })
+        console.error('Error fetching plans:', error)
+        return NextResponse.json({ error: 'Error fetching plans' }, { status: 500 })
     }
 }
 
-// POST /api/plans - Create a custom plan (admin only)
 export async function POST(request: Request) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { workspaceId: true }
+    })
+
+    if (!user?.workspaceId) {
+        return NextResponse.json({ error: 'No workspace found' }, { status: 400 })
+    }
+
     try {
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user || session.user.role !== 'ADMIN') {
-            return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-        }
-
         const body = await request.json()
         const { name, postsPerMonth, carouselsPerMonth, reelsPerMonth, storiesPerMonth } = body
 
         if (!name) {
-            return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 })
+            return NextResponse.json({ error: 'Name is required' }, { status: 400 })
         }
 
         const plan = await prisma.plan.create({
             data: {
                 name,
-                postsPerMonth: postsPerMonth || 12,
-                carouselsPerMonth: carouselsPerMonth || 4,
-                reelsPerMonth: reelsPerMonth || 4,
-                storiesPerMonth: storiesPerMonth || 8,
-            },
+                postsPerMonth: Number(postsPerMonth) || 0,
+                carouselsPerMonth: Number(carouselsPerMonth) || 0,
+                reelsPerMonth: Number(reelsPerMonth) || 0,
+                storiesPerMonth: Number(storiesPerMonth) || 0,
+                workspaceId: user.workspaceId
+            }
         })
 
-        return NextResponse.json(plan, { status: 201 })
+        return NextResponse.json(plan)
     } catch (error) {
         console.error('Error creating plan:', error)
-        return NextResponse.json({ error: 'Error al crear plan' }, { status: 500 })
+        return NextResponse.json({ error: 'Error creating plan' }, { status: 500 })
+    }
+}
+
+export async function DELETE(request: Request) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { workspaceId: true }
+    })
+
+    try {
+        // Verify ownership
+        const plan = await prisma.plan.findUnique({ where: { id } })
+
+        if (!plan) return NextResponse.json({ error: 'Plan not found' }, { status: 404 })
+
+        // Only allow deleting custom plans belonging to this workspace
+        if (plan.workspaceId !== user?.workspaceId) {
+            return NextResponse.json({ error: 'Cannot delete this plan' }, { status: 403 })
+        }
+
+        await prisma.plan.delete({ where: { id } })
+
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error('Error deleting plan:', error)
+        return NextResponse.json({ error: 'Error deleting plan' }, { status: 500 })
     }
 }

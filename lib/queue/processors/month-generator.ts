@@ -70,11 +70,12 @@ export async function generateMonthProcessor(job: Job) {
     };
 
     // 4. Build Content Plan
+    // Priority: Client Override > Plan Value > Default
     const contentPlan: ContentPlan = {
-        posts: client.plan?.postsPerMonth || 12,
-        carousels: client.plan?.carouselsPerMonth || 4,
-        reels: client.plan?.reelsPerMonth || 4,
-        stories: client.plan?.storiesPerMonth || 10,
+        posts: client.customPostsPerMonth ?? client.plan?.postsPerMonth ?? 12,
+        carousels: client.customCarouselsPerMonth ?? client.plan?.carouselsPerMonth ?? 4,
+        reels: client.customReelsPerMonth ?? client.plan?.reelsPerMonth ?? 4,
+        stories: client.customStoriesPerMonth ?? client.plan?.storiesPerMonth ?? 10,
     };
 
     // 5. Generate content using simplified monolithic approach

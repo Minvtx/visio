@@ -111,6 +111,11 @@ model Client {
   contentMonths ContentMonth[]
   users         User[]
   googleDriveFolderId String?
+  customPostsPerMonth     Int?
+  customCarouselsPerMonth Int?
+  customReelsPerMonth     Int?
+  customStoriesPerMonth   Int?
+  
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -205,6 +210,9 @@ model Plan {
   carouselsPerMonth Int      @default(4)
   reelsPerMonth     Int      @default(4)
   storiesPerMonth   Int      @default(8)
+  
+  workspaceId       String?
+  
   clients           Client[]
   createdAt         DateTime @default(now())
 }

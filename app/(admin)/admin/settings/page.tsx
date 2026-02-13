@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Key, Building2, CreditCard, Check, X, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
+import { Settings, Key, Building2, CreditCard, Check, X, Eye, EyeOff, AlertCircle, Loader2, Package, Plus } from 'lucide-react'
 
 interface SettingsData {
     workspace: {
@@ -32,9 +32,61 @@ export default function SettingsPage() {
     const [showAnthropicKey, setShowAnthropicKey] = useState(false)
     const [showOpenaiKey, setShowOpenaiKey] = useState(false)
 
+    // Custom Plans State
+    const [userPlans, setUserPlans] = useState<any[]>([])
+    const [newPlan, setNewPlan] = useState({ name: '', posts: '', carousels: '', reels: '', stories: '' })
+
     useEffect(() => {
         fetchSettings()
+        fetchUserPlans()
     }, [])
+
+    async function fetchUserPlans() {
+        try {
+            const res = await fetch('/api/plans')
+            if (res.ok) {
+                const plans = await res.json()
+                // Filter only custom plans (those with workspaceId)
+                setUserPlans(plans.filter((p: any) => p.workspaceId))
+            }
+        } catch (e) { console.error(e) }
+    }
+
+    async function handleCreatePlan() {
+        setSaving(true)
+        try {
+            const res = await fetch('/api/plans', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: newPlan.name,
+                    postsPerMonth: newPlan.posts,
+                    carouselsPerMonth: newPlan.carousels,
+                    reelsPerMonth: newPlan.reels,
+                    storiesPerMonth: newPlan.stories
+                })
+            })
+            if (!res.ok) throw new Error('Error creating plan')
+            setNewPlan({ name: '', posts: '', carousels: '', reels: '', stories: '' })
+            setSuccess('Plan creado correctamente')
+            fetchUserPlans()
+        } catch (e) {
+            setError('Error al crear plan')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    async function handleDeletePlan(id: string) {
+        if (!confirm('¿Eliminar este plan?')) return
+        try {
+            const res = await fetch(`/api/plans?id=${id}`, { method: 'DELETE' })
+            if (!res.ok) throw new Error('Error deleting')
+            fetchUserPlans()
+        } catch (e) {
+            setError('Error al eliminar plan')
+        }
+    }
 
     async function fetchSettings() {
         try {
@@ -218,6 +270,72 @@ export default function SettingsPage() {
                             >
                                 Guardar
                             </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Custom Plans Section */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                    <Package className="w-5 h-5 text-purple-400" />
+                    <h2 className="text-lg font-semibold text-white">Planes Personalizados</h2>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* List User Plans */}
+                        {userPlans.map(plan => (
+                            <div key={plan.id} className="p-4 bg-white/5 border border-white/10 rounded-xl relative group hover:border-purple-500/30 transition-colors">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className="font-semibold text-white">{plan.name}</h3>
+                                    <button
+                                        onClick={() => handleDeletePlan(plan.id)}
+                                        className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
+                                    <span>📝 {plan.postsPerMonth} Posts</span>
+                                    <span>🎠 {plan.carouselsPerMonth} Carruseles</span>
+                                    <span>🎬 {plan.reelsPerMonth} Reels</span>
+                                    <span>📱 {plan.storiesPerMonth} Stories</span>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Create New Plan Card */}
+                        <div className="p-4 border-2 border-dashed border-white/10 rounded-xl hover:border-purple-500/30 transition-colors">
+                            <h3 className="font-medium text-white mb-3 flex items-center gap-2">
+                                <Plus className="w-4 h-4 text-purple-400" />
+                                Nuevo Plan
+                            </h3>
+                            <div className="space-y-3">
+                                <input
+                                    placeholder="Nombre (ej: Startup Pack)"
+                                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-purple-500"
+                                    value={newPlan.name}
+                                    onChange={e => setNewPlan({ ...newPlan, name: e.target.value })}
+                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="number" placeholder="Posts" className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white"
+                                        value={newPlan.posts} onChange={e => setNewPlan({ ...newPlan, posts: e.target.value })} />
+                                    <input type="number" placeholder="Carruseles" className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white"
+                                        value={newPlan.carousels} onChange={e => setNewPlan({ ...newPlan, carousels: e.target.value })} />
+                                    <input type="number" placeholder="Reels" className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white"
+                                        value={newPlan.reels} onChange={e => setNewPlan({ ...newPlan, reels: e.target.value })} />
+                                    <input type="number" placeholder="Stories" className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white"
+                                        value={newPlan.stories} onChange={e => setNewPlan({ ...newPlan, stories: e.target.value })} />
+                                </div>
+                                <button
+                                    onClick={handleCreatePlan}
+                                    disabled={saving || !newPlan.name}
+                                    className="w-full py-2 bg-white/10 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Crear Plan'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

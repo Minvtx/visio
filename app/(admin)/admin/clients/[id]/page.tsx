@@ -47,7 +47,9 @@ interface Plan {
     carouselsPerMonth: number
     reelsPerMonth: number
     storiesPerMonth: number
-    totalPieces: number
+    workspaceId: string | null
+    createdAt: Date
+    totalPieces?: number
 }
 
 interface Client {
@@ -82,6 +84,10 @@ interface Client {
     } | null
     contentMonths: ContentMonth[]
     googleDriveFolderId?: string | null
+    customPostsPerMonth?: number | null
+    customCarouselsPerMonth?: number | null
+    customReelsPerMonth?: number | null
+    customStoriesPerMonth?: number | null
     _count: {
         assets: number
         users: number
@@ -125,6 +131,11 @@ export default function ClientDetailPage() {
     const [genPieceCount, setGenPieceCount] = useState({ done: 0, total: 0 })
     const [deletingId, setDeletingId] = useState<string | null>(null)
 
+    // Plan Overrides State
+    const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+    const [useOverrides, setUseOverrides] = useState(false)
+    const [overrides, setOverrides] = useState({ posts: 0, carousels: 0, reels: 0, stories: 0 })
+
     useEffect(() => {
         fetchClient()
         fetchPlans()
@@ -137,6 +148,19 @@ export default function ClientDetailPage() {
             if (res.ok) {
                 const data = await res.json()
                 setClient(data)
+                // Init overrides form
+                if (data.plan) {
+                    setSelectedPlanId(data.plan.id)
+                    // Check if client has ANY override set (even 0 is a valid override)
+                    const hasCustom = data.customPostsPerMonth !== null || data.customCarouselsPerMonth !== null || data.customReelsPerMonth !== null || data.customStoriesPerMonth !== null
+                    setUseOverrides(hasCustom)
+                    setOverrides({
+                        posts: data.customPostsPerMonth ?? data.plan.postsPerMonth,
+                        carousels: data.customCarouselsPerMonth ?? data.plan.carouselsPerMonth,
+                        reels: data.customReelsPerMonth ?? data.plan.reelsPerMonth,
+                        stories: data.customStoriesPerMonth ?? data.plan.storiesPerMonth
+                    })
+                }
             }
         } catch (err) {
             console.error('Error fetching client:', err)
@@ -196,13 +220,28 @@ export default function ClientDetailPage() {
         }
     }
 
-    const handleAssignPlan = async (planId: string) => {
+    const handleAssignPlan = async () => {
+        if (!selectedPlanId) return
         setSavingPlan(true)
         try {
+            const body: any = { planId: selectedPlanId }
+            if (useOverrides) {
+                body.customPostsPerMonth = Number(overrides.posts)
+                body.customCarouselsPerMonth = Number(overrides.carousels)
+                body.customReelsPerMonth = Number(overrides.reels)
+                body.customStoriesPerMonth = Number(overrides.stories)
+            } else {
+                // Reset overrides if unchecked
+                body.customPostsPerMonth = null
+                body.customCarouselsPerMonth = null
+                body.customReelsPerMonth = null
+                body.customStoriesPerMonth = null
+            }
+
             const res = await fetch(`/api/clients/${clientId}/plan`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ planId }),
+                body: JSON.stringify(body),
             })
             if (res.ok) {
                 await fetchClient()
@@ -354,7 +393,14 @@ export default function ClientDetailPage() {
 
     const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     const totalPieces = client.contentMonths.reduce((acc, m) => acc + (m._count?.pieces || 0), 0)
-    const piecesPerMonth = client.plan ? (client.plan.totalPieces || (client.plan.postsPerMonth + client.plan.carouselsPerMonth + client.plan.reelsPerMonth + client.plan.storiesPerMonth)) : 0
+
+    // Calculate pieces per month considering overrides
+    const piecesPerMonth = client.plan ? (
+        (client.customPostsPerMonth ?? client.plan.postsPerMonth) +
+        (client.customCarouselsPerMonth ?? client.plan.carouselsPerMonth) +
+        (client.customReelsPerMonth ?? client.plan.reelsPerMonth) +
+        (client.customStoriesPerMonth ?? client.plan.storiesPerMonth)
+    ) : 0
 
     return (
         <div className="space-y-6">
@@ -483,17 +529,32 @@ export default function ClientDetailPage() {
                                     <div className="flex items-center gap-3">
                                         <Package className="w-5 h-5 text-primary" />
                                         <div>
-                                            <span className="font-semibold">Plan {client.plan.name}</span>
-                                            <span className="text-muted-foreground ml-2">
-                                                • {client.plan.totalPieces || (client.plan.postsPerMonth + client.plan.carouselsPerMonth + client.plan.reelsPerMonth + client.plan.storiesPerMonth)} piezas/mes
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-semibold">Plan {client.plan.name}</span>
+                                                {(client.customPostsPerMonth !== null || client.customCarouselsPerMonth !== null) && (
+                                                    <span className="text-xs bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded border border-amber-500/20">
+                                                        Personalizado
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-muted-foreground text-sm">
+                                                • {piecesPerMonth} piezas/mes
                                             </span>
                                         </div>
                                     </div>
                                     <div className="flex gap-4 text-sm">
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.postsPerMonth} Posts</span>
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.carouselsPerMonth} Carruseles</span>
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.reelsPerMonth} Reels</span>
-                                        <span className="px-2 py-1 bg-background rounded">{client.plan.storiesPerMonth} Stories</span>
+                                        <span className={`px-2 py-1 bg-background rounded ${client.customPostsPerMonth !== null ? 'text-amber-500 border border-amber-500/20' : ''}`}>
+                                            {client.customPostsPerMonth ?? client.plan.postsPerMonth} Posts
+                                        </span>
+                                        <span className={`px-2 py-1 bg-background rounded ${client.customCarouselsPerMonth !== null ? 'text-amber-500 border border-amber-500/20' : ''}`}>
+                                            {client.customCarouselsPerMonth ?? client.plan.carouselsPerMonth} Carruseles
+                                        </span>
+                                        <span className={`px-2 py-1 bg-background rounded ${client.customReelsPerMonth !== null ? 'text-amber-500 border border-amber-500/20' : ''}`}>
+                                            {client.customReelsPerMonth ?? client.plan.reelsPerMonth} Reels
+                                        </span>
+                                        <span className={`px-2 py-1 bg-background rounded ${client.customStoriesPerMonth !== null ? 'text-amber-500 border border-amber-500/20' : ''}`}>
+                                            {client.customStoriesPerMonth ?? client.plan.storiesPerMonth} Stories
+                                        </span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -873,50 +934,100 @@ export default function ClientDetailPage() {
                             </Button>
                         </div>
                         <div className="p-6">
-                            <div className="grid grid-cols-3 gap-4">
-                                {plans.map((plan) => (
-                                    <div
-                                        key={plan.id}
-                                        onClick={() => !savingPlan && handleAssignPlan(plan.id)}
-                                        className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${client.plan?.id === plan.id
-                                            ? 'border-primary bg-primary/5'
-                                            : 'border-border hover:border-primary/50'
-                                            }`}
-                                    >
-                                        {client.plan?.id === plan.id && (
-                                            <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                                                <Check className="w-3 h-3 text-white" />
+                            <div className="mb-6">
+                                <h3 className="text-sm font-medium mb-3 text-muted-foreground">1. Elige un Plan Base</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {plans.map((plan) => (
+                                        <div
+                                            key={plan.id}
+                                            onClick={() => {
+                                                setSelectedPlanId(plan.id)
+                                                // If overrides are NOT active, update the preview values to match the selected plan
+                                                if (!useOverrides) {
+                                                    setOverrides({
+                                                        posts: plan.postsPerMonth,
+                                                        carousels: plan.carouselsPerMonth,
+                                                        reels: plan.reelsPerMonth,
+                                                        stories: plan.storiesPerMonth
+                                                    })
+                                                }
+                                            }}
+                                            className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedPlanId === plan.id
+                                                ? 'border-primary bg-primary/5'
+                                                : 'border-border hover:border-primary/50'
+                                                }`}
+                                        >
+                                            {selectedPlanId === plan.id && (
+                                                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                                                    <Check className="w-3 h-3 text-white" />
+                                                </div>
+                                            )}
+                                            <h3 className={`text-lg font-bold mb-1 ${plan.name === 'Pro' ? 'text-amber-500' :
+                                                plan.name === 'Growth' ? 'text-primary' : 'text-foreground'
+                                                }`}>
+                                                {plan.name}
+                                            </h3>
+                                            <div className="text-sm text-muted-foreground mb-3">
+                                                {plan.workspaceId ? 'Personalizado' : 'Sistema'}
                                             </div>
-                                        )}
-                                        <h3 className={`text-lg font-bold mb-2 ${plan.name === 'Pro' ? 'text-amber-500' :
-                                            plan.name === 'Growth' ? 'text-primary' : 'text-foreground'
-                                            }`}>
-                                            {plan.name}
-                                        </h3>
-                                        <div className="text-3xl font-bold mb-3">
-                                            {plan.totalPieces || (plan.postsPerMonth + plan.carouselsPerMonth + plan.reelsPerMonth + plan.storiesPerMonth)}
-                                            <span className="text-sm font-normal text-muted-foreground ml-1">piezas/mes</span>
+
+                                            <div className="space-y-1 text-xs text-muted-foreground">
+                                                <div className="flex justify-between"><span>Posts</span> <b>{plan.postsPerMonth}</b></div>
+                                                <div className="flex justify-between"><span>Carruseles</span> <b>{plan.carouselsPerMonth}</b></div>
+                                                <div className="flex justify-between"><span>Reels</span> <b>{plan.reelsPerMonth}</b></div>
+                                                <div className="flex justify-between"><span>Stories</span> <b>{plan.storiesPerMonth}</b></div>
+                                            </div>
                                         </div>
-                                        <div className="space-y-1 text-sm text-muted-foreground">
-                                            <div className="flex justify-between">
-                                                <span>Posts</span>
-                                                <span className="font-medium text-foreground">{plan.postsPerMonth}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Carruseles</span>
-                                                <span className="font-medium text-foreground">{plan.carouselsPerMonth}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Reels</span>
-                                                <span className="font-medium text-foreground">{plan.reelsPerMonth}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Stories</span>
-                                                <span className="font-medium text-foreground">{plan.storiesPerMonth}</span>
-                                            </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mb-6 p-4 bg-secondary/30 rounded-xl border border-border">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <input
+                                        type="checkbox"
+                                        id="useOverrides"
+                                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                                        checked={useOverrides}
+                                        onChange={(e) => setUseOverrides(e.target.checked)}
+                                    />
+                                    <label htmlFor="useOverrides" className="text-sm font-medium cursor-pointer select-none">
+                                        Personalizar cantidades para este cliente (Override)
+                                    </label>
+                                </div>
+
+                                {useOverrides && (
+                                    <div className="grid grid-cols-4 gap-4 animate-in slide-in-from-top-2 fade-in">
+                                        <div>
+                                            <label className="text-xs text-muted-foreground block mb-1">Posts</label>
+                                            <input type="number" className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                                                value={overrides.posts} onChange={e => setOverrides({ ...overrides, posts: Number(e.target.value) })} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-muted-foreground block mb-1">Carruseles</label>
+                                            <input type="number" className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                                                value={overrides.carousels} onChange={e => setOverrides({ ...overrides, carousels: Number(e.target.value) })} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-muted-foreground block mb-1">Reels</label>
+                                            <input type="number" className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                                                value={overrides.reels} onChange={e => setOverrides({ ...overrides, reels: Number(e.target.value) })} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-muted-foreground block mb-1">Stories</label>
+                                            <input type="number" className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                                                value={overrides.stories} onChange={e => setOverrides({ ...overrides, stories: Number(e.target.value) })} />
                                         </div>
                                     </div>
-                                ))}
+                                )}
+                            </div>
+
+                            <div className="flex justify-end gap-3">
+                                <Button variant="ghost" onClick={() => setShowPlanModal(false)}>Cancelar</Button>
+                                <Button onClick={handleAssignPlan} disabled={savingPlan || !selectedPlanId}>
+                                    {savingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+                                    Guardar Cambios
+                                </Button>
                             </div>
                             {savingPlan && (
                                 <div className="mt-4 text-center">
