@@ -52,12 +52,14 @@ export function FinalCTA() {
                     <span>Empieza tu prueba gratis hoy</span>
                 </div>
 
-                <h2 className="text-5xl md:text-7xl font-bold text-white mb-8 tracking-tight">
-                    Alcanza tu cenit.
+                <h2 className="text-5xl md:text-7xl font-bold text-white mb-8 tracking-tight leading-tight">
+                    Deja de jugar a la agencia.<br />
+                    <span className="text-meridian-gold">Empieza a escalar.</span>
                 </h2>
 
                 <p className="text-xl text-meridian-cream/60 mb-12 max-w-2xl mx-auto">
-                    Únete a las miles de marcas modernas que han automatizado su crecimiento social con Meridian.
+                    El sistema está listo. La IA está entrenada.
+                    Solo faltas tú para tomar el control.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">

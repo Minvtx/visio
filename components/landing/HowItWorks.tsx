@@ -5,23 +5,23 @@ import { ClipboardList, Zap, Check, Calendar } from "lucide-react"
 
 const steps = [
     {
-        title: "Define tu Estrategia",
-        description: "Ingresa tus guías de marca, tono de voz y objetivos mensuales.",
+        title: "Inyecta tu ADN",
+        description: "Sube tu Brand Kit. Nuestra IA absorbe tu voz, estilo y valores. No aprende a imitarte; aprende a ser tú.",
         icon: ClipboardList,
     },
     {
-        title: "Genera en un Click",
-        description: "Mira como nuestros agentes de IA localizados crean 30 días de contenido único.",
+        title: "Arquitectura Estratégica",
+        description: "Define objetivos mensuales. El sistema construye el puente entre tu meta comercial y tu calendario editorial.",
         icon: Zap,
     },
     {
-        title: "Revisa y Refina",
-        description: "Aprueba posts o solicita ajustes. La IA aprende de tu feedback.",
+        title: "Materialización Instantánea",
+        description: "Observa cómo se generan docenas de activos multiformato en segundos. Edita con precisión quirúrgica.",
         icon: Check,
     },
     {
-        title: "Programa o Exporta",
-        description: "Publica directamente o descarga tus assets en un solo click.",
+        title: "Control de Misión",
+        description: "Envía a aprobación vía Portal. Sin emails, sin caos. Tu cliente valida, el sistema publica.",
         icon: Calendar,
     },
 ]

@@ -6,18 +6,18 @@ import { Clock, UserX, Mail } from "lucide-react"
 const problems = [
     {
         icon: Clock,
-        title: "Briefing Interminable",
-        description: "Semanas coordinando qué postear y cuándo. El documento de estrategia que nunca termina."
+        title: "Micro-Gestión Infinita",
+        description: "Tu talento se quema moviendo pixeles y persiguiendo feedbacks. La creatividad muere en la burocracia."
     },
     {
         icon: UserX,
-        title: "Creación Manual",
-        description: "Diseñadores y copywriters bloqueados. Energía creativa desperdiciada en ejecución repetitiva."
+        title: "Desconexión Total",
+        description: "El diseñador no habla con el estratega. El cliente no entiende nada. Silos que destruyen valor."
     },
     {
         icon: Mail,
-        title: "Aprobaciones Eternas",
-        description: "Hilo de 30 emails para 3 posts. Cambios de contexto que matan la productividad."
+        title: "Ceguera de Datos",
+        description: "Publicas y rezas. Sin un sistema centralizado, no estás iterando, estás adivinando."
     }
 ]
 
@@ -38,8 +38,8 @@ export function ProblemSection() {
                         viewport={{ once: true }}
                         className="text-4xl md:text-5xl font-bold text-meridian-deep mb-6"
                     >
-                        30 días. 30 posts. <br />
-                        <span className="text-meridian-deep/50">Horas infinitas perdidas.</span>
+                        Tu agencia está operando <br />
+                        <span className="text-meridian-deep/50">en la edad de piedra digital.</span>
                     </motion.h2>
                 </div>
 

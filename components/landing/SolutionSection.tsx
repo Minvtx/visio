@@ -38,36 +38,35 @@ export function SolutionSection() {
                             viewport={{ once: true }}
                             className="text-4xl md:text-5xl font-bold text-meridian-deep mb-6"
                         >
-                            Un solo click. <br />
-                            <span className="text-meridian-precision">Un mes entero.</span>
+                            Inteligencia que diseña. <br />
+                            <span className="text-meridian-precision">Estrategia que escala.</span>
                         </motion.h2>
                         <p className="text-xl text-meridian-deep/70 mb-8 leading-relaxed">
-                            Tu briefing se convierte en estrategia. Nuestra IA la hace realidad.
-                            Mira cómo minutos se transforman en un mes de contenido de alta calidad.
+                            Tu marca no necesita más manos. Necesita un cerebro centralizado.
+                            Meridian no es una herramienta; es tu nuevo departamento creativo.
                         </p>
 
-                        <div className="space-y-6 mb-10">
+                        <ul className="space-y-6 mb-10">
                             {[
-                                { icon: Sparkles, text: "Agente Inteligente de Briefing" },
+                                { icon: Sparkles, text: "Clones Creativos de Alta Fidelidad" },
                                 { icon: Zap, text: "Generación Multi-Formato Instantánea" },
-                                { icon: Check, text: "Flujo de Aprobación Centralizado" }
+                                { icon: Check, text: "Portal de Transparencia Radical" }
                             ].map((item, i) => (
-                                <motion.div
+                                <motion.li
                                     key={i}
                                     initial={{ opacity: 0, x: -20 }}
                                     whileInView={{ opacity: 1, x: 0 }}
                                     viewport={{ once: true }}
                                     transition={{ delay: i * 0.1 }}
-                                    className="flex items-center gap-4"
+                                    className="flex items-center gap-4 text-meridian-deep"
                                 >
                                     <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm text-meridian-gold">
                                         <item.icon className="w-5 h-5" />
                                     </div>
-                                    <span className="font-medium text-meridian-deep">{item.text}</span>
-                                </motion.div>
+                                    <span className="text-lg font-medium">{item.text}</span>
+                                </motion.li>
                             ))}
-                        </div>
-
+                        </ul>
                         <Button
                             size="lg"
                             className="bg-meridian-deep text-white hover:bg-meridian-deep/90 rounded-full px-8 h-12"
@@ -137,6 +136,6 @@ export function SolutionSection() {
                     </div>
                 </div>
             </div>
-        </section>
+        </section >
     )
 }

@@ -29,7 +29,9 @@ export async function middleware(request: NextRequest) {
             pathname.startsWith('/setup')
         ) {
             const url = new URL(request.url)
-            url.hostname = `platform.${url.hostname}`
+            // Strip 'www.' if present before adding 'platform.'
+            const cleanHostname = url.hostname.replace(/^www\./, '')
+            url.hostname = `platform.${cleanHostname}`
             return NextResponse.redirect(url)
         }
 

@@ -8,9 +8,9 @@ import Link from "next/link"
 
 const plans = [
     {
-        name: "Starter",
+        name: "Iniciada",
         price: { monthly: 49, yearly: 39 },
-        description: "Perfecto para solopreneurs y creadores.",
+        description: "Para agencias que están despertando.",
         features: [
             "5 Agentes de Marca IA",
             "100 Posts Generados/mes",
@@ -19,23 +19,23 @@ const plans = [
         ]
     },
     {
-        name: "Professional",
+        name: "Ascensión",
         price: { monthly: 99, yearly: 79 },
-        description: "Para agencias en crecimiento y equipos de marketing.",
+        description: "El estándar para escalar operaciones.",
         popular: true,
         features: [
             "Agentes de Marca Ilimitados",
             "Generación Ilimitada",
             "5 Espacios de Trabajo",
             "Analíticas Avanzadas",
-            "Portal de Aprobación de Clientes",
+            "Portal de Transparencia Radical",
             "Soporte Prioritario",
         ]
     },
     {
-        name: "Enterprise",
+        name: "Dominio",
         price: { monthly: 299, yearly: 249 },
-        description: "Soluciones a medida para grandes organizaciones.",
+        description: "Poder total y personalización absoluta.",
         features: [
             "Todo en Professional",
             "Entrenamiento de Modelos IA Personalizados",
