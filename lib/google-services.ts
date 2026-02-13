@@ -13,6 +13,19 @@ export class GoogleServices {
     }
 
     /**
+     * Check if a user has a valid Google connection
+     */
+    async checkConnection(userId: string): Promise<boolean> {
+        const account = await prisma.account.findFirst({
+            where: {
+                userId,
+                provider: 'google',
+            },
+        })
+        return !!(account && account.access_token)
+    }
+
+    /**
      * Get an authenticated Google client for a specific user
      */
     async getAuthenticatedClient(userId: string) {
@@ -24,7 +37,7 @@ export class GoogleServices {
         })
 
         if (!account || !account.access_token) {
-            throw new Error('No Google account connected or tokens missing')
+            throw new Error('NO_GOOGLE_CONNECTION')
         }
 
         this.oauth2Client.setCredentials({

@@ -175,7 +175,16 @@ export default function ClientDetailPage() {
             const res = await fetch(`/api/clients/${clientId}/init-drive`, {
                 method: 'POST',
             })
-            if (!res.ok) throw new Error('Error al inicializar Drive')
+            if (!res.ok) {
+                const data = await res.json()
+                if (data.code === 'NO_GOOGLE_CONNECTION' || res.status === 401) {
+                    if (confirm('Para usar esta función necesitas conectar tu cuenta de Google. \n\n¿Quieres cerrar sesión y entrar con Google?')) {
+                        window.location.href = '/api/auth/signin/google'
+                    }
+                    return
+                }
+                throw new Error(data.error || 'Error al inicializar Drive')
+            }
             const data = await res.json()
             alert(`Google Drive inicializado: ${data.name}`)
             await fetchClient()
@@ -316,10 +325,11 @@ export default function ClientDetailPage() {
 
         } catch (error: any) {
             console.error(error)
-            setError(error.message || 'Error fatal al generar')
-            setGenStatus('❌ Error')
+            const errorMsg = error.message || 'Error fatal al generar'
+            setError(errorMsg)
+            setGenStatus(`❌ ${errorMsg.slice(0, 50)}...`) // Show summary in overlay
         } finally {
-            setTimeout(() => setGenerating(false), 2000)
+            setTimeout(() => setGenerating(false), 4000) // Give time to read
         }
     }
 

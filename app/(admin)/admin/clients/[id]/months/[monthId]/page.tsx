@@ -212,12 +212,29 @@ export default function ContentMonthPage() {
 
             interval = setInterval(async () => {
                 const refreshed = await fetchMonth();
+
+                // Calculate progress based on pieces
+                if (refreshed && refreshed.pieces) {
+                    const plan = refreshed.client?.plan;
+                    const totalPieces = plan
+                        ? (plan.postsPerMonth + plan.carouselsPerMonth + plan.reelsPerMonth + plan.storiesPerMonth)
+                        : (refreshed.strategy?.posts || 30);
+
+                    const generatedPieces = refreshed.pieces.length;
+
+                    // Simple progress calculation: 10% for starting + (90% * pieces / total)
+                    const progress = Math.min(100, Math.floor(10 + (generatedPieces / totalPieces * 90)));
+                    setGenProgress(progress);
+                    setGenPieceCount({ done: generatedPieces, total: totalPieces });
+                }
+
                 // ONLY close if we got a valid response AND status is no longer GENERATING
                 if (refreshed && refreshed.status !== 'GENERATING') {
                     setGenerating(false);
+                    setGenProgress(100);
                     if (interval) clearInterval(interval);
                 }
-            }, 6000); // Poll every 6s
+            }, 4000); // Poll every 4s for better responsiveness
         }
 
         return () => {

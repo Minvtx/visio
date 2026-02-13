@@ -34,6 +34,15 @@ export async function POST(
 
         console.log(`[DriveSync] Creating folder for client: ${client.name}...`)
 
+        // Check if user has Google connection
+        const isConnected = await googleServices.checkConnection(session.user.id)
+        if (!isConnected) {
+            return NextResponse.json({
+                error: 'No has conectado tu cuenta de Google',
+                code: 'NO_GOOGLE_CONNECTION'
+            }, { status: 400 })
+        }
+
         // Create the folder in Google Drive
         const folder = await googleServices.createDriveFolder(session.user.id, `VISIO - ${client.name}`)
 

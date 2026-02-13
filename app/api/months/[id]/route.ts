@@ -29,6 +29,14 @@ export async function GET(
                         country: true,
                         city: true,
                         dialect: true,
+                        plan: {
+                            select: {
+                                postsPerMonth: true,
+                                carouselsPerMonth: true,
+                                reelsPerMonth: true,
+                                storiesPerMonth: true,
+                            }
+                        }
                     },
                 },
                 pieces: {
