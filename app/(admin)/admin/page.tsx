@@ -7,12 +7,21 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboard() {
-    const clientsCount = await prisma.client.count()
+    const session = await getServerSession(authOptions)
+    const workspaceId = session?.user?.workspaceId
+
+    const clientsCount = await prisma.client.count({
+        where: {
+            workspaceId: workspaceId || undefined
+        }
+    })
 
     return (
         <div className="space-y-8">
