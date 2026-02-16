@@ -51,6 +51,13 @@ const formatEmojis: Record<string, string> = {
     STORY: '📱',
 }
 
+const formatLabels: Record<string, string> = {
+    POST: 'Post',
+    CAROUSEL: 'Carrusel',
+    REEL: 'Reel',
+    STORY: 'Historia',
+}
+
 const pillarColors: Record<string, string> = {
     'Educación': 'bg-indigo-500',
     'Producto': 'bg-purple-500',
@@ -114,20 +121,18 @@ function DroppableDay({ day, children, disabled }: { day: number | null, childre
 }
 
 function PieceCard({ piece }: { piece: any }) {
+    const type = piece.type || piece.format
     return (
         <div
             className={`block p-1.5 rounded-md text-[10px] sm:text-xs border-l-2 bg-secondary/40 shadow-sm ${statusColors[piece.status] || 'border-l-gray-400'}`}
         >
             <div className="flex items-center gap-1 mb-0.5">
-                <span>{formatEmojis[piece.type || piece.format]}</span>
+                <span>{formatEmojis[type]}</span>
                 <span className="font-medium truncate">{piece.title || 'Sin título'}</span>
             </div>
-            {piece.pillar && (
-                <div className="flex items-center gap-1">
-                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${getPillarColor(piece.pillar)}`} />
-                    <span className="text-muted-foreground truncate">{piece.pillar}</span>
-                </div>
-            )}
+            <div className="text-[10px] text-muted-foreground truncate font-medium opacity-80">
+                {formatLabels[type] || type}
+            </div>
         </div>
     )
 }
@@ -567,23 +572,7 @@ export default function ContentMonthPage() {
                     <p className="text-muted-foreground mt-1">{monthData.client?.name}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap relative">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs border-blue-500/30 text-blue-600"
-                        onClick={() => {
-                            alert('Ejecutando diagnóstico completo... Esto puede tardar 30s. Esperá el resultado.')
-                            fetch(`/api/months/${monthId}/debug-generate`)
-                                .then(r => r.json())
-                                .then(d => {
-                                    const logsText = (d.logs || []).join('\n')
-                                    alert(`Resultado: ${d.success ? '✅ OK' : '❌ FALLO'}\n\nError: ${d.error || 'ninguno'}\nPiezas en DB: ${d.piecesInDb || '?'}\n\nLogs:\n${logsText}`)
-                                })
-                                .catch(e => alert('Error de conexión: ' + e.message))
-                        }}
-                    >
-                        🔬 Diagnosticar
-                    </Button>
+
                     <Button
                         variant="outline"
                         onClick={handleSyncCalendar}

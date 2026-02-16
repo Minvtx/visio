@@ -1,6 +1,7 @@
 
 'use client'
 
+import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
 import {
     DropdownMenu,
@@ -43,18 +44,24 @@ export function UserMenu() {
                     </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Mi Perfil</span>
+                <DropdownMenuItem asChild>
+                    <Link href="/admin/settings" className="cursor-pointer">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Mi Perfil</span>
+                    </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Configuración</span>
+                <DropdownMenuItem asChild>
+                    <Link href="/admin/settings" className="cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Configuración</span>
+                    </Link>
                 </DropdownMenuItem>
                 {user.role === 'ADMIN' && (
-                    <DropdownMenuItem className="cursor-pointer">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Panel Admin</span>
+                    <DropdownMenuItem asChild>
+                        <Link href="/admin/users" className="cursor-pointer">
+                            <Shield className="mr-2 h-4 w-4" />
+                            <span>Panel Admin</span>
+                        </Link>
                     </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />

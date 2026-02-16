@@ -7,7 +7,13 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function AdminDashboard() {
+import { prisma } from '@/lib/prisma'
+
+export const dynamic = 'force-dynamic'
+
+export default async function AdminDashboard() {
+    const clientsCount = await prisma.client.count()
+
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -20,31 +26,58 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
-            {/* Welcome Card */}
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-                <CardContent className="p-8">
-                    <div className="flex items-start gap-6">
-                        <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center flex-shrink-0">
-                            <Rocket className="w-8 h-8 text-white" />
+            {/* Welcome Card - Conditional */}
+            {clientsCount === 0 ? (
+                <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                    <CardContent className="p-8">
+                        <div className="flex items-start gap-6">
+                            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center flex-shrink-0">
+                                <Rocket className="w-8 h-8 text-white" />
+                            </div>
+                            <div className="flex-1">
+                                <h2 className="text-2xl font-bold mb-2">¡Comencemos!</h2>
+                                <p className="text-muted-foreground mb-4">
+                                    Creá tu primer cliente para empezar a generar contenido con IA.
+                                    En minutos vas a tener un mes completo de publicaciones listas.
+                                </p>
+                                <Link
+                                    href="/admin/clients"
+                                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg gradient-primary text-white font-medium hover:opacity-90 transition-opacity"
+                                >
+                                    <Users className="w-5 h-5" />
+                                    Crear mi primer cliente
+                                    <ArrowRight className="w-4 h-4" />
+                                </Link>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <h2 className="text-2xl font-bold mb-2">¡Comencemos!</h2>
-                            <p className="text-muted-foreground mb-4">
-                                Creá tu primer cliente para empezar a generar contenido con IA.
-                                En minutos vas a tener un mes completo de publicaciones listas.
-                            </p>
-                            <Link
-                                href="/admin/clients"
-                                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg gradient-primary text-white font-medium hover:opacity-90 transition-opacity"
-                            >
-                                <Users className="w-5 h-5" />
-                                Crear mi primer cliente
-                                <ArrowRight className="w-4 h-4" />
-                            </Link>
+                    </CardContent>
+                </Card>
+            ) : (
+                <Card className="border-border bg-card">
+                    <CardContent className="p-8">
+                        <div className="flex items-center gap-6">
+                            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center flex-shrink-0">
+                                <Users className="w-8 h-8 text-primary" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold mb-2">Tenés {clientsCount} cliente{clientsCount !== 1 ? 's' : ''} activos</h2>
+                                <p className="text-muted-foreground">
+                                    Seleccioná un cliente para gestionar su contenido o creá uno nuevo.
+                                </p>
+                            </div>
+                            <div className="ml-auto">
+                                <Link
+                                    href="/admin/clients"
+                                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border hover:bg-secondary transition-colors"
+                                >
+                                    Ver todos los clientes
+                                    <ArrowRight className="w-4 h-4" />
+                                </Link>
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Quick Actions */}
             <div className="grid gap-6 md:grid-cols-2">
